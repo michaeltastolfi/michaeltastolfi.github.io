@@ -992,10 +992,10 @@
    device sync — phone and glasses must be tabs in the same browser).
    ═════════════════════════════════════════════════════════════════════ */
 const FIREBASE_CONFIG = {
-  apiKey:       'YOUR_API_KEY',
-  authDomain:   'YOUR_PROJECT.firebaseapp.com',
-  databaseURL:  'https://YOUR_PROJECT-default-rtdb.firebaseio.com',
-  projectId:    'YOUR_PROJECT',
+  apiKey: "AIzaSyCNao4ORYgK-h00L2hRhpdDshoSyvDdFcw",
+  authDomain: "mtg-price-scanner.firebaseapp.com",
+  databaseURL: "https://mtg-price-scanner-default-rtdb.firebaseio.com",
+  projectId: "mtg-price-scanner",
 };
 
 const FIREBASE_READY =
