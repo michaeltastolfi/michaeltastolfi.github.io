@@ -19,11 +19,11 @@
     TCGplayer Market price — no TCGplayer partner key required.
 
   Sync between the two surfaces:
-    localStorage + the cross-tab `storage` event. Works perfectly if both
-    surfaces are tabs in the same browser. For real cross-device sync (phone
-    in one browser, glasses in another), swap pushScan() and the poll loop
-    for a tiny WebSocket/SSE/Firebase relay — the shape of the data stays
-    identical.
+    Firebase Realtime Database when FIREBASE_CONFIG is filled in — phone writes
+    to `rooms/<CODE>/scans`, glasses subscribe via `onValue`, updates appear
+    instantly across devices. Falls back to localStorage + the cross-tab
+    'storage' event when Firebase is not configured (same-browser only).
+    The 4-char room code is the shared key both surfaces use to find each other.
 -->
 <html lang="en">
 <head>
@@ -35,6 +35,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
+<!-- Firebase Realtime Database (compat build — exposes `firebase` global) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 <style>
   :root {
     /* Phone palette — parchment + ink, gold accent (MTG card visual lineage) */
@@ -187,6 +190,155 @@
     padding: 2px 6px;
     color: var(--gold);
   }
+
+  /* Room code panel */
+  .room-panel {
+    margin-top: 32px;
+    padding: 22px 24px;
+    background: linear-gradient(180deg, rgba(212,168,58,0.06) 0%, rgba(212,168,58,0.02) 100%);
+    border: 1px solid rgba(212,168,58,0.35);
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .room-panel h4 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+  .room-panel p {
+    font-size: 12px;
+    line-height: 1.6;
+    color: rgba(245,236,215,0.65);
+  }
+  .room-row {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .room-input {
+    flex: 1;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(212,168,58,0.4);
+    color: var(--paper);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 0.3em;
+    text-align: center;
+    text-transform: uppercase;
+    padding: 12px 14px;
+    outline: none;
+  }
+  .room-input:focus { border-color: var(--gold); }
+  .room-btn {
+    border: 1px solid var(--gold);
+    background: transparent;
+    color: var(--gold);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 0 18px;
+    transition: all 160ms ease;
+    white-space: nowrap;
+  }
+  .room-btn:hover { background: rgba(212,168,58,0.12); }
+  .room-current {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.4);
+    border: 1px dashed rgba(212,168,58,0.4);
+  }
+  .room-current-code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.3em;
+    color: var(--gold);
+  }
+  .room-current-lbl {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    color: rgba(245,236,215,0.5);
+    text-transform: uppercase;
+  }
+  .room-link {
+    background: none;
+    border: none;
+    color: var(--gold);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .pcard[disabled] {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* Config-missing banner */
+  .config-banner {
+    margin: 0 auto 18px;
+    max-width: 520px;
+    padding: 12px 16px;
+    background: rgba(139,58,43,0.15);
+    border-left: 3px solid var(--rust);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--paper-d);
+  }
+  .config-banner strong {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--rust);
+    margin-bottom: 4px;
+  }
+  .config-banner code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    background: rgba(0,0,0,0.4);
+    padding: 1px 5px;
+    color: var(--gold);
+  }
+
+  /* Surface room indicator */
+  .room-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--gold);
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border: 1px solid rgba(212,168,58,0.35);
+    background: rgba(0,0,0,0.3);
+  }
+  .room-chip .rc-code { color: var(--paper); font-weight: 600; letter-spacing: 0.24em; }
+  .hud-top .room-chip {
+    border-color: var(--hud-rule);
+    color: var(--hud-cyan);
+    background: transparent;
+  }
+  .hud-top .room-chip .rc-code { color: var(--hud-cream); }
 
   /* ═══════════════════════════════════════════════════════════════════
      PHONE SURFACE
@@ -702,13 +854,13 @@
   <div class="picker-sub">MTG Card Scanner · Meta Ray-Ban Display</div>
 
   <div class="picker-cards">
-    <button class="pcard" onclick="goto('phone')">
+    <button class="pcard" id="pickPhone" onclick="goto('phone')">
       <div class="pcard-icon">◉</div>
       <h3>Phone Scanner</h3>
       <p>Live camera with OCR recognition. Reads the card title, looks it up on Scryfall, fetches TCGplayer Market price.</p>
       <span class="tag">Open on phone</span>
     </button>
-    <button class="pcard" onclick="goto('glasses')">
+    <button class="pcard" id="pickGlasses" onclick="goto('glasses')">
       <div class="pcard-icon">◇</div>
       <h3>Glasses HUD</h3>
       <p>600 × 600 additive display per MRBD spec. Arrow-key navigation, dark background, bright high-contrast UI.</p>
@@ -716,10 +868,36 @@
     </button>
   </div>
 
+  <div class="config-banner" id="configBanner" hidden>
+    <strong>Firebase not configured</strong>
+    Running in local-only mode — phone and glasses will only sync if they're in the same browser. To sync across devices, fill in the <code>FIREBASE_CONFIG</code> block at the top of the <code>&lt;script&gt;</code> tag with your project credentials. See README in the picker note below.
+  </div>
+
+  <div class="room-panel" id="roomPanel">
+    <h4>Pair phone &amp; glasses</h4>
+    <p>Enter the same room code on both surfaces, or generate a new one and copy it across. Codes are 4 characters, easy to read aloud. Stored locally on each device.</p>
+
+    <div class="room-row" id="roomEntry">
+      <input class="room-input" id="roomInput" maxlength="4" placeholder="ABCD" autocomplete="off" spellcheck="false">
+      <button class="room-btn" id="roomJoinBtn" type="button">Join</button>
+      <button class="room-btn" id="roomGenBtn" type="button">Generate</button>
+    </div>
+
+    <div class="room-current" id="roomCurrent" hidden>
+      <div>
+        <div class="room-current-lbl">Paired in room</div>
+        <div class="room-current-code" id="roomCurrentCode">—</div>
+      </div>
+      <button class="room-link" type="button" onclick="clearRoom()">Change</button>
+    </div>
+  </div>
+
   <p class="picker-note">
-    Open both views — the phone scans, the glasses display. They sync via shared storage.
-    For full cross-device testing, host this file and follow Meta's MRBD test docs to install the glasses URL as a Web App.
-    Add <code>?demo</code> to either URL to preload sample scans.
+    Open the phone surface on your phone and the glasses surface on your MRBD glasses.
+    Pair them by entering the same room code on both, then scan. Codes are 4 characters
+    and persist locally on each device. Add <code>?demo</code> to either URL to preload
+    sample scans. For cross-device sync to work you need Firebase configured — see the
+    <code>FIREBASE_CONFIG</code> block at the top of the &lt;script&gt; tag.
   </p>
 </div>
 
@@ -727,7 +905,10 @@
 <div id="phone" hidden>
   <div class="ph-head">
     <h1>SCRY &amp; PRICE</h1>
-    <span class="role">Scanner · Phone</span>
+    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+      <span class="role">Scanner · Phone</span>
+      <span class="room-chip" id="phoneRoomChip" hidden>Room · <span class="rc-code" id="phoneRoomCode">—</span></span>
+    </div>
   </div>
 
   <div class="scanner">
@@ -781,6 +962,7 @@
     <div class="hud-top">
       <div class="hud-title">SCRY · PRICE</div>
       <div class="hud-status">
+        <span class="room-chip" id="glassesRoomChip" hidden style="margin-right: 6px;"><span class="rc-code" id="glassesRoomCode">—</span></span>
         <span class="hud-dot idle" id="hudDot"></span>
         <span id="hudStat">WAITING</span>
       </div>
@@ -816,20 +998,114 @@
 'use strict';
 
 /* ═════════════════════════════════════════════════════════════════════
-   STORAGE  —  unified across artifact env (window.storage), self-hosted
-   (localStorage), and cross-tab updates via the 'storage' event.
+   FIREBASE CONFIG  —  fill these in from your Firebase project's web
+   app settings (Project settings → General → Your apps → Web app).
+   You ONLY need a Realtime Database, not Firestore.
+
+   Database rules (set in Firebase console → Realtime Database → Rules):
+   {
+     "rules": {
+       "rooms": {
+         "$roomId": { ".read": true, ".write": true }
+       }
+     }
+   }
+
+   These rules are intentionally open within the rooms node. The 4-char
+   room code is your only access control — fine for a personal demo,
+   not for anything you'd publish. Tighten with Firebase Auth later.
+
+   Leave the placeholders as-is to run in local-only mode (no cross-
+   device sync — phone and glasses must be tabs in the same browser).
+   ═════════════════════════════════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey:       'YOUR_API_KEY',
+  authDomain:   'YOUR_PROJECT.firebaseapp.com',
+  databaseURL:  'https://YOUR_PROJECT-default-rtdb.firebaseio.com',
+  projectId:    'YOUR_PROJECT',
+};
+
+const FIREBASE_READY =
+  FIREBASE_CONFIG.databaseURL &&
+  !FIREBASE_CONFIG.databaseURL.includes('YOUR_PROJECT') &&
+  typeof firebase !== 'undefined';
+
+let fbDb = null;
+if (FIREBASE_READY) {
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbDb = firebase.database();
+    console.info('Firebase ready · syncing via', FIREBASE_CONFIG.databaseURL);
+  } catch (e) {
+    console.error('Firebase init failed — falling back to localStorage:', e);
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+   ROOM CODE  —  the shared key both surfaces use to talk to each other
+   ═════════════════════════════════════════════════════════════════════ */
+const ROOM_KEY = 'mtg-room-code';
+const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1
+
+function generateRoomCode() {
+  let out = '';
+  const arr = new Uint8Array(4);
+  crypto.getRandomValues(arr);
+  for (let i = 0; i < 4; i++) out += ROOM_ALPHABET[arr[i] % ROOM_ALPHABET.length];
+  return out;
+}
+
+function getRoom() {
+  return (localStorage.getItem(ROOM_KEY) || '').toUpperCase().trim();
+}
+
+function setRoom(code) {
+  const clean = (code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  if (!clean || clean.length !== 4) return null;
+  localStorage.setItem(ROOM_KEY, clean);
+  // Re-render and re-subscribe if a surface is already active
+  detachGlassesListener();
+  syncRoomChips();
+  refreshPickerRoomUi();
+  if (currentMode() === 'glasses') initGlasses(true);
+  if (currentMode() === 'phone') refreshGlasses(); // no-op on phone, harmless
+  return clean;
+}
+
+function clearRoom() {
+  localStorage.removeItem(ROOM_KEY);
+  detachGlassesListener();
+  syncRoomChips();
+  refreshPickerRoomUi();
+  if (currentMode()) { location.hash = ''; render(); }
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+   STORAGE  —  Firebase RTDB when configured, else localStorage (single-
+   browser only). Both branches expose the same shape: a list of scans.
    ═════════════════════════════════════════════════════════════════════ */
 const STORAGE_KEY = 'mtg-scans-v1';
 const MAX_RECENT = 8;
-const hasArtifactStorage = typeof window.storage !== 'undefined'
-  && window.storage && typeof window.storage.get === 'function';
+
+function roomScansRef() {
+  if (!fbDb) return null;
+  const room = getRoom();
+  if (!room) return null;
+  return fbDb.ref(`rooms/${room}/scans`);
+}
 
 async function loadScans() {
-  try {
-    if (hasArtifactStorage) {
-      const r = await window.storage.get(STORAGE_KEY);
-      return r ? JSON.parse(r.value) : [];
+  // Firebase path
+  if (fbDb && getRoom()) {
+    try {
+      const snap = await roomScansRef().limitToLast(MAX_RECENT).once('value');
+      return snapToArray(snap);
+    } catch (e) {
+      console.warn('Firebase loadScans failed, falling back to local:', e);
     }
+  }
+  // localStorage fallback
+  try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch (e) {
@@ -838,26 +1114,46 @@ async function loadScans() {
   }
 }
 
-async function saveScans(arr) {
-  const payload = JSON.stringify(arr);
-  try {
-    if (hasArtifactStorage) {
-      await window.storage.set(STORAGE_KEY, payload);
-    }
-    // Always also write to localStorage so the cross-tab 'storage' event fires
-    localStorage.setItem(STORAGE_KEY, payload);
-  } catch (e) {
-    console.warn('saveScans failed', e);
+function snapToArray(snap) {
+  const val = snap.val();
+  if (!val) return [];
+  // Object → array, dedupe by oracle_id keeping the most recent, newest first
+  const all = Object.entries(val).map(([k, v]) => ({ ...v, _key: k }));
+  all.sort((a, b) => (b.scanned_at || 0) - (a.scanned_at || 0));
+  const seen = new Set();
+  const out = [];
+  for (const c of all) {
+    const id = c.oracle_id || c.id;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(c);
+    if (out.length >= MAX_RECENT) break;
   }
+  return out;
 }
 
 async function pushScan(card) {
-  const existing = await loadScans();
-  // Dedupe by oracle_id (or scryfall id), most-recent-first
-  const id = card.oracle_id || card.id;
-  const updated = [card, ...existing.filter(c => (c.oracle_id || c.id) !== id)].slice(0, MAX_RECENT);
-  await saveScans(updated);
-  return updated;
+  // Firebase path
+  if (fbDb && getRoom()) {
+    try {
+      await roomScansRef().push({ ...card, scanned_at: Date.now() });
+      return await loadScans();
+    } catch (e) {
+      console.warn('Firebase pushScan failed, falling back to local:', e);
+    }
+  }
+  // localStorage fallback — keep the old dedupe-on-write behaviour
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const existing = raw ? JSON.parse(raw) : [];
+    const id = card.oracle_id || card.id;
+    const updated = [card, ...existing.filter(c => (c.oracle_id || c.id) !== id)].slice(0, MAX_RECENT);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    return updated;
+  } catch (e) {
+    console.warn('pushScan failed', e);
+    return [];
+  }
 }
 
 /* ═════════════════════════════════════════════════════════════════════
@@ -873,6 +1169,10 @@ function isDemo() {
 }
 
 function goto(mode) {
+  if (!getRoom()) {
+    // Auto-generate so the user can just tap a card and go
+    setRoom(generateRoomCode());
+  }
   location.hash = mode + (isDemo() ? '?demo' : '');
   render();
 }
@@ -883,15 +1183,71 @@ function render() {
   document.getElementById('phone').hidden = mode !== 'phone';
   document.getElementById('glasses').hidden = mode !== 'glasses';
 
+  syncRoomChips();
+
   if (mode === 'glasses') {
     if (isDemo()) seedDemoScans();
     initGlasses();
   } else if (mode === 'phone') {
     if (isDemo()) seedDemoScans();
     initPhone();
+  } else {
+    refreshPickerRoomUi();
   }
 }
 window.addEventListener('hashchange', render);
+
+/* ─────────── Picker / room-code UI ─────────── */
+function refreshPickerRoomUi() {
+  const banner = document.getElementById('configBanner');
+  banner.hidden = !!fbDb;
+
+  const room = getRoom();
+  const entry = document.getElementById('roomEntry');
+  const current = document.getElementById('roomCurrent');
+  if (room) {
+    entry.hidden = true;
+    current.hidden = false;
+    document.getElementById('roomCurrentCode').textContent = room;
+  } else {
+    entry.hidden = false;
+    current.hidden = true;
+    document.getElementById('roomInput').value = '';
+  }
+}
+
+function syncRoomChips() {
+  const room = getRoom();
+  ['phoneRoomChip', 'glassesRoomChip'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.hidden = !room;
+  });
+  if (room) {
+    const a = document.getElementById('phoneRoomCode'); if (a) a.textContent = room;
+    const b = document.getElementById('glassesRoomCode'); if (b) b.textContent = room;
+  }
+}
+
+function bindPickerOnce() {
+  if (bindPickerOnce._done) return;
+  bindPickerOnce._done = true;
+  document.getElementById('roomGenBtn').addEventListener('click', () => {
+    setRoom(generateRoomCode());
+  });
+  document.getElementById('roomJoinBtn').addEventListener('click', () => {
+    const v = document.getElementById('roomInput').value;
+    if (!setRoom(v)) {
+      alert('Room codes are 4 characters (letters + digits).');
+    }
+  });
+  document.getElementById('roomInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('roomJoinBtn').click();
+  });
+  document.getElementById('roomInput').addEventListener('input', (e) => {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  });
+}
 
 /* ═════════════════════════════════════════════════════════════════════
    SCRYFALL  —  fuzzy name lookup. Scryfall ships TCGplayer Market USD
@@ -1115,32 +1471,65 @@ function showPhoneResult(card) {
    ═════════════════════════════════════════════════════════════════════ */
 let glassesState = { scans: [], featuredIdx: 0 };
 let glassesPollTimer = null;
+let glassesFbRef = null;
+let glassesStorageListener = null;
 
-async function initGlasses() {
-  if (initGlasses._bound) {
+function detachGlassesListener() {
+  if (glassesFbRef) {
+    try { glassesFbRef.off('value'); } catch (e) {}
+    glassesFbRef = null;
+  }
+  if (glassesPollTimer) {
+    clearInterval(glassesPollTimer);
+    glassesPollTimer = null;
+  }
+  if (glassesStorageListener) {
+    window.removeEventListener('storage', glassesStorageListener);
+    glassesStorageListener = null;
+  }
+}
+
+async function initGlasses(forceRebind) {
+  if (initGlasses._bound && !forceRebind) {
     await refreshGlasses();
     return;
   }
   initGlasses._bound = true;
 
-  // Detect "real glasses" mode (no hash routing, served at root) — for now,
-  // we use a body class to drop the preview chrome. Toggle with ?bare in URL.
   if (location.search.includes('bare') || location.hash.includes('bare')) {
     document.body.classList.add('glasses-only');
   }
 
+  detachGlassesListener();
   await refreshGlasses();
 
-  // Cross-tab live updates
-  window.addEventListener('storage', (e) => {
-    if (e.key === STORAGE_KEY) refreshGlasses();
-  });
-  // Belt-and-suspenders polling for environments without 'storage' events
+  if (fbDb && getRoom()) {
+    // Real-time: Firebase pushes updates as soon as the phone writes
+    glassesFbRef = roomScansRef().limitToLast(MAX_RECENT);
+    glassesFbRef.on('value', (snap) => {
+      glassesState.scans = snapToArray(snap);
+      if (glassesState.featuredIdx >= glassesState.scans.length) glassesState.featuredIdx = 0;
+      updateHudStatus();
+      renderFeatured();
+      renderList();
+    }, (err) => {
+      console.warn('Firebase listener error:', err);
+      // Fall back to polling so we still show something
+      startGlassesPollFallback();
+    });
+  } else {
+    // No Firebase → cross-tab 'storage' events + a slow poll
+    glassesStorageListener = (e) => { if (e.key === STORAGE_KEY) refreshGlasses(); };
+    window.addEventListener('storage', glassesStorageListener);
+    startGlassesPollFallback();
+  }
+
+  document.addEventListener('keydown', handleGlassesKey);
+}
+
+function startGlassesPollFallback() {
   if (glassesPollTimer) clearInterval(glassesPollTimer);
   glassesPollTimer = setInterval(refreshGlasses, 2500);
-
-  // Arrow / Enter / Esc focus management per MRBD docs
-  document.addEventListener('keydown', handleGlassesKey);
 }
 
 function handleGlassesKey(e) {
@@ -1185,19 +1574,22 @@ async function refreshGlasses() {
   const scans = await loadScans();
   glassesState.scans = scans;
   if (glassesState.featuredIdx >= scans.length) glassesState.featuredIdx = 0;
-
-  const dot = document.getElementById('hudDot');
-  const stat = document.getElementById('hudStat');
-  if (scans.length) {
-    dot.classList.remove('idle');
-    stat.textContent = `LIVE · ${scans.length} CARD${scans.length === 1 ? '' : 'S'}`;
-  } else {
-    dot.classList.add('idle');
-    stat.textContent = 'WAITING';
-  }
-
+  updateHudStatus();
   renderFeatured();
   renderList();
+}
+
+function updateHudStatus() {
+  const dot = document.getElementById('hudDot');
+  const stat = document.getElementById('hudStat');
+  const n = glassesState.scans.length;
+  if (n) {
+    dot.classList.remove('idle');
+    stat.textContent = `LIVE · ${n} CARD${n === 1 ? '' : 'S'}`;
+  } else {
+    dot.classList.add('idle');
+    stat.textContent = fbDb && getRoom() ? 'WAITING · SUBSCRIBED' : 'WAITING';
+  }
 }
 
 function renderFeatured() {
@@ -1339,12 +1731,14 @@ async function seedDemoScans() {
 /* ═════════════════════════════════════════════════════════════════════
    BOOT
    ═════════════════════════════════════════════════════════════════════ */
+bindPickerOnce();
 render();
 
-// Cleanup the OCR worker on page unload so we don't leak memory across HMR/refresh
+// Cleanup the OCR worker and Firebase listener on page unload
 window.addEventListener('beforeunload', () => {
   if (ocrWorker) ocrWorker.terminate();
   if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+  detachGlassesListener();
 });
 </script>
 </body>
