@@ -1,30 +1,3 @@
-<!DOCTYPE html>
-<!--
-  MTG Card Price Scanner — Meta Ray-Ban Display Web App + Phone Companion
-  ────────────────────────────────────────────────────────────────────────
-  Two surfaces, one file, hosted at one URL:
-    https://yourhost/mtg-scanner.html#phone     ← run on the paired phone
-    https://yourhost/mtg-scanner.html#glasses   ← installed as the MRBD Web App
-
-  Why two surfaces?
-    Meta's Web Apps API for MRBD does NOT currently expose Camera, Microphone,
-    or text input (see https://wearables.developer.meta.com/docs/develop/webapps/build/).
-    So the camera + OCR + Scryfall lookup happens on the phone, and the glasses
-    show a 600×600 dark/additive HUD with the latest recognized card + its
-    TCGplayer Market price.
-
-  Pricing source:
-    Scryfall ships TCGplayer Market USD in its `prices.usd` field (and foil in
-    `prices.usd_foil`). One API call gets you both the card metadata AND the
-    TCGplayer Market price — no TCGplayer partner key required.
-
-  Sync between the two surfaces:
-    localStorage + the cross-tab `storage` event. Works perfectly if both
-    surfaces are tabs in the same browser. For real cross-device sync (phone
-    in one browser, glasses in another), swap pushScan() and the poll loop
-    for a tiny WebSocket/SSE/Firebase relay — the shape of the data stays
-    identical.
--->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
