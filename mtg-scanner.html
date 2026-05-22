@@ -33,6 +33,10 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='14' fill='%23000'/%3E%3Ctext x='50' y='68' font-family='serif' font-size='62' font-weight='900' text-anchor='middle' fill='%23d4a83a'%3E$%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Preconnect to the APIs we'll hit on every scan — saves the TLS handshake on the first request -->
+<link rel="preconnect" href="https://api.scryfall.com" crossorigin>
+<link rel="preconnect" href="https://cards.scryfall.io" crossorigin>
+<link rel="dns-prefetch" href="https://api.scryfall.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
 <!-- Firebase Realtime Database (compat build — exposes `firebase` global) -->
@@ -1133,27 +1137,35 @@ function snapToArray(snap) {
 }
 
 async function pushScan(card) {
-  // Firebase path
+  const stamped = { ...card, scanned_at: Date.now() };
+  // Firebase path — fire-and-forget so the phone UI updates immediately.
+  // The glasses will receive the push via their onValue listener; the phone
+  // doesn't actually need to wait for the network round-trip to finish.
   if (fbDb && getRoom()) {
-    try {
-      await roomScansRef().push({ ...card, scanned_at: Date.now() });
-      return await loadScans();
-    } catch (e) {
-      console.warn('Firebase pushScan failed, falling back to local:', e);
-    }
+    roomScansRef().push(stamped).catch(e => {
+      console.warn('Firebase pushScan failed (continuing on local):', e);
+      // If Firebase silently fails, still save locally so it isn't lost.
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const existing = raw ? JSON.parse(raw) : [];
+        const id = stamped.oracle_id || stamped.id;
+        const updated = [stamped, ...existing.filter(c => (c.oracle_id || c.id) !== id)].slice(0, MAX_RECENT);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch (_) {}
+    });
+    return stamped;
   }
-  // localStorage fallback — keep the old dedupe-on-write behaviour
+  // localStorage fallback
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const existing = raw ? JSON.parse(raw) : [];
-    const id = card.oracle_id || card.id;
-    const updated = [card, ...existing.filter(c => (c.oracle_id || c.id) !== id)].slice(0, MAX_RECENT);
+    const id = stamped.oracle_id || stamped.id;
+    const updated = [stamped, ...existing.filter(c => (c.oracle_id || c.id) !== id)].slice(0, MAX_RECENT);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updated;
   } catch (e) {
-    console.warn('pushScan failed', e);
-    return [];
+    console.warn('pushScan local fallback failed', e);
   }
+  return stamped;
 }
 
 /* ═════════════════════════════════════════════════════════════════════
@@ -1252,16 +1264,34 @@ function bindPickerOnce() {
 /* ═════════════════════════════════════════════════════════════════════
    SCRYFALL  —  fuzzy name lookup. Scryfall ships TCGplayer Market USD
    in `prices.usd` and foil in `prices.usd_foil`.
+
+   The strategy is two-step for resilience against OCR noise:
+   1. Try /cards/named?fuzzy=<text> — fast, single hop, works for any
+      input that's "close enough" by Scryfall's similarity threshold.
+   2. If that 404s (it's stricter than people expect), fall back to
+      /cards/autocomplete?q=<text> to get the top candidate name, then
+      look THAT name up exactly. This recovers from things like
+      "RAGAYAN NIMBLE PIIFERER" → "Ragavan, Nimble Pilferer".
    ═════════════════════════════════════════════════════════════════════ */
 async function scryfallLookup(query) {
-  const url = `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`;
-  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-  if (!res.ok) {
-    if (res.status === 404) throw new Error(`No card matches "${query}"`);
-    throw new Error(`Scryfall returned ${res.status}`);
-  }
-  const c = await res.json();
-  return normaliseCard(c);
+  // Step 1: fuzzy
+  const fuzzyUrl = `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`;
+  let res = await fetch(fuzzyUrl, { headers: { 'Accept': 'application/json' } });
+  if (res.ok) return normaliseCard(await res.json());
+  if (res.status !== 404) throw new Error(`Scryfall returned ${res.status}`);
+
+  // Step 2: autocomplete → top candidate → exact lookup
+  const acUrl = `https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(query)}&include_extras=false`;
+  const acRes = await fetch(acUrl, { headers: { 'Accept': 'application/json' } });
+  if (!acRes.ok) throw new Error(`No card matches "${query}"`);
+  const ac = await acRes.json();
+  const candidate = ac && ac.data && ac.data[0];
+  if (!candidate) throw new Error(`No card matches "${query}"`);
+
+  const exactUrl = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(candidate)}`;
+  res = await fetch(exactUrl, { headers: { 'Accept': 'application/json' } });
+  if (!res.ok) throw new Error(`Found candidate "${candidate}" but lookup failed`);
+  return normaliseCard(await res.json());
 }
 
 function normaliseCard(c) {
@@ -1290,7 +1320,12 @@ function normaliseCard(c) {
    PHONE  —  Camera, capture, OCR, lookup
    ═════════════════════════════════════════════════════════════════════ */
 let videoStream = null;
+let videoTrack = null;
+let imageCapture = null;
 let ocrWorker = null;
+// Native Shape Detection API — fast and free on Android Chrome. Falls back to Tesseract.
+const NATIVE_TEXT_DETECTOR = ('TextDetector' in window);
+let nativeDetector = null;
 
 function setStatus(text, klass) {
   const el = document.getElementById('status');
@@ -1311,6 +1346,12 @@ async function initPhone() {
   document.getElementById('manualInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doManualLookup();
   });
+
+  // Warm up Tesseract in the background so the first scan doesn't pay the
+  // ~2s engine-load cost. Native TextDetector doesn't need warming up.
+  if (!NATIVE_TEXT_DETECTOR) {
+    setTimeout(() => { ensureTesseract().catch(() => {}); }, 600);
+  }
 }
 
 async function startCamera() {
@@ -1318,27 +1359,83 @@ async function startCamera() {
   const captureBtn = document.getElementById('captureBtn');
   try {
     setStatus('Requesting camera permission…');
+    // Ask for the biggest reasonable frame the device can give us. Higher
+    // resolution = sharper title text = better OCR.
     videoStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 1280 } },
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1920 },
+        height: { ideal: 1920 },
+      },
       audio: false
     });
     const video = document.getElementById('video');
     video.srcObject = videoStream;
     await video.play();
+
+    videoTrack = videoStream.getVideoTracks()[0];
+    // ImageCapture gives us full-sensor stills via takePhoto() — typically
+    // 4x the pixel count of the preview stream. Not on Safari/iOS though.
+    if ('ImageCapture' in window) {
+      try { imageCapture = new ImageCapture(videoTrack); } catch (_) { imageCapture = null; }
+    }
+    // Try to enable continuous autofocus if the device exposes it.
+    try {
+      const caps = videoTrack.getCapabilities && videoTrack.getCapabilities();
+      if (caps && caps.focusMode && caps.focusMode.includes('continuous')) {
+        await videoTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+      }
+    } catch (_) {}
+
     startBtn.textContent = 'Camera on';
     startBtn.disabled = true;
     captureBtn.disabled = false;
-    setStatus('Line up the card. The dashed band marks where the card title should sit.', 'ok');
+    const engine = NATIVE_TEXT_DETECTOR ? 'native TextDetector' : 'Tesseract.js';
+    setStatus(`Line up the card so the title fills the dashed band. OCR: ${engine}.`, 'ok');
   } catch (e) {
     setStatus(`Camera unavailable: ${e.message}. Use the manual lookup below.`, 'error');
   }
 }
 
-function cropTitleRegion(video) {
-  // Mirror the on-screen title-band: inset 8% on all sides, top 13% of THAT box
-  const vw = video.videoWidth, vh = video.videoHeight;
+/**
+ * Grab a frame at the highest resolution we can. Returns a {bitmap,width,height}
+ * source we can crop from. Prefers ImageCapture.takePhoto() (full sensor),
+ * falls back to grabFrame() (preview-res ImageBitmap), then to a <canvas>
+ * drawImage of the video element (always works, lowest res).
+ */
+async function grabBestFrame(video) {
+  if (imageCapture && imageCapture.takePhoto) {
+    try {
+      const blob = await imageCapture.takePhoto();
+      const bmp = await createImageBitmap(blob);
+      return { bitmap: bmp, width: bmp.width, height: bmp.height, source: 'photo' };
+    } catch (_) { /* fall through */ }
+  }
+  if (imageCapture && imageCapture.grabFrame) {
+    try {
+      const bmp = await imageCapture.grabFrame();
+      return { bitmap: bmp, width: bmp.width, height: bmp.height, source: 'grabFrame' };
+    } catch (_) { /* fall through */ }
+  }
+  // Last resort: paint the <video> into a canvas
+  if (!video.videoWidth) throw new Error('Camera not running yet');
+  const c = document.createElement('canvas');
+  c.width = video.videoWidth; c.height = video.videoHeight;
+  c.getContext('2d').drawImage(video, 0, 0);
+  return { bitmap: c, width: c.width, height: c.height, source: 'video' };
+}
+
+/**
+ * Crop the title band from a captured frame, scale it up for OCR, and run
+ * Otsu's algorithm for adaptive binarization. Otsu picks a per-image
+ * threshold that separates background from text — much more robust than
+ * the flat "stretch around 128" we used before.
+ */
+function cropTitleRegion(frame) {
+  const { bitmap, width: vw, height: vh } = frame;
   if (!vw || !vh) return null;
 
+  // The on-screen overlay marks: 8% inset on all sides, then top 13% of that inner box.
   const inset = 0.08;
   const bandH = 0.13;
   const innerW = vw * (1 - 2 * inset);
@@ -1348,41 +1445,103 @@ function cropTitleRegion(video) {
   const sw = innerW;
   const sh = innerH * bandH;
 
+  // Scale to a target height — OCR engines like ~50-80px tall text.
+  // Standard MTG title cap-height is ~32-38px of an 80px band on a typical card capture.
+  const targetH = 240;
+  const scale = targetH / sh;
   const c = document.createElement('canvas');
-  // Upscale a touch for OCR
-  const scale = 2;
   c.width = Math.floor(sw * scale);
   c.height = Math.floor(sh * scale);
-  const ctx = c.getContext('2d');
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, c.width, c.height);
 
-  // Light pre-processing: grayscale + contrast bump
+  // Pass 1: grayscale → histogram for Otsu's threshold
   const img = ctx.getImageData(0, 0, c.width, c.height);
   const d = img.data;
+  const hist = new Uint32Array(256);
   for (let i = 0; i < d.length; i += 4) {
-    const v = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-    // Stretch contrast around 128
-    const k = Math.max(0, Math.min(255, (v - 128) * 1.4 + 128));
-    d[i] = d[i+1] = d[i+2] = k;
+    const v = (0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2]) | 0;
+    d[i] = d[i+1] = d[i+2] = v;
+    hist[v]++;
+  }
+  const total = (d.length / 4) | 0;
+  let sum = 0;
+  for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let sumB = 0, wB = 0, varMax = 0, threshold = 127;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (wB === 0) continue;
+    const wF = total - wB;
+    if (wF === 0) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB;
+    const mF = (sum - sumB) / wF;
+    const v = wB * wF * (mB - mF) * (mB - mF);
+    if (v > varMax) { varMax = v; threshold = t; }
+  }
+
+  // Pass 2: binarize. MTG titles are dark text on a light cream/colored
+  // background, so pixels above threshold → white background, below → black text.
+  // For sets where the title bar is dark (some modern frames), we also produce
+  // an inverted version below.
+  for (let i = 0; i < d.length; i += 4) {
+    const v = d[i] > threshold ? 255 : 0;
+    d[i] = d[i+1] = d[i+2] = v;
   }
   ctx.putImageData(img, 0, 0);
-  return c;
+
+  // Also produce the inverted version for retry-on-fail
+  const inv = document.createElement('canvas');
+  inv.width = c.width; inv.height = c.height;
+  const invCtx = inv.getContext('2d');
+  invCtx.drawImage(c, 0, 0);
+  const invImg = invCtx.getImageData(0, 0, inv.width, inv.height);
+  const id = invImg.data;
+  for (let i = 0; i < id.length; i += 4) {
+    id[i] = 255 - id[i]; id[i+1] = 255 - id[i+1]; id[i+2] = 255 - id[i+2];
+  }
+  invCtx.putImageData(invImg, 0, 0);
+
+  return { primary: c, inverted: inv, threshold };
 }
 
-async function ensureOCR() {
+async function ensureTesseract() {
   if (ocrWorker) return ocrWorker;
   if (typeof Tesseract === 'undefined') {
     throw new Error('OCR engine failed to load (CDN unreachable). Use the manual lookup below.');
   }
   setStatus('Loading OCR engine (one-time, ~3 MB)…');
   ocrWorker = await Tesseract.createWorker('eng');
-  // Card titles are a single line with mixed letters, apostrophes, commas, hyphens
   await ocrWorker.setParameters({
     tessedit_char_whitelist:
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ,'-",
     tessedit_pageseg_mode: '7' // single text line
   });
   return ocrWorker;
+}
+
+/** Read text from a canvas using whichever engine is fastest/available. */
+async function readText(canvas) {
+  // Native first — runs in ~50-150ms on Android Chrome.
+  if (NATIVE_TEXT_DETECTOR) {
+    try {
+      if (!nativeDetector) nativeDetector = new window.TextDetector();
+      const blocks = await nativeDetector.detect(canvas);
+      if (blocks && blocks.length) {
+        // TextDetector returns blocks sorted by reading order on Android.
+        // Pick the widest one as the title (titles span most of the band).
+        blocks.sort((a, b) => b.boundingBox.width - a.boundingBox.width);
+        return (blocks[0].rawValue || '').trim();
+      }
+    } catch (e) {
+      console.warn('Native TextDetector failed, falling back:', e);
+    }
+  }
+  // Tesseract fallback (or sole engine on iOS / older Android)
+  const worker = await ensureTesseract();
+  const { data: { text } } = await worker.recognize(canvas);
+  return (text || '').trim();
 }
 
 function cleanTitleText(raw) {
@@ -1396,27 +1555,45 @@ function cleanTitleText(raw) {
 async function captureAndIdentify() {
   const captureBtn = document.getElementById('captureBtn');
   captureBtn.disabled = true;
+  const t0 = performance.now();
   try {
     const video = document.getElementById('video');
-    if (!video.videoWidth) throw new Error('Camera not running yet');
+    setStatus('Capturing frame…');
+    const frame = await grabBestFrame(video);
 
-    const cropped = cropTitleRegion(video);
+    const cropped = cropTitleRegion(frame);
     if (!cropped) throw new Error('Could not capture frame');
 
-    const worker = await ensureOCR();
-    setStatus('Reading card title (OCR)…');
-    const { data: { text } } = await worker.recognize(cropped);
-    const guess = cleanTitleText(text);
+    setStatus(`Reading title (${frame.source}, ${frame.width}×${frame.height}, Otsu t=${cropped.threshold})…`);
 
-    if (!guess || guess.length < 3) {
-      throw new Error(`OCR couldn't read a name. Try better lighting, or type the name below.`);
+    // Try the primary binarization first; if Scryfall can't find anything,
+    // retry with the inverted version (in case of dark title bars).
+    const guesses = [];
+    let card = null;
+    let lastErr = null;
+    for (const canvas of [cropped.primary, cropped.inverted]) {
+      const raw = await readText(canvas);
+      const guess = cleanTitleText(raw);
+      if (guess && guess.length >= 3) {
+        guesses.push(guess);
+        try {
+          card = await scryfallLookup(guess);
+          break;
+        } catch (e) { lastErr = e; }
+      }
     }
 
-    setStatus(`OCR read “${guess}” — searching Scryfall…`);
-    const card = await scryfallLookup(guess);
-    await pushScan(card);
+    if (!card) {
+      const hint = guesses.length
+        ? `OCR read “${guesses.join('” / “')}” — no match on Scryfall. Try better lighting or type the name below.`
+        : `OCR couldn't read a name. Try better lighting, less glare, or type the name below.`;
+      throw new Error(hint);
+    }
+
+    pushScan(card); // fire-and-forget
     showPhoneResult(card);
-    setStatus(`Matched ${card.name} (${card.set_name}).`, 'ok');
+    const elapsed = Math.round(performance.now() - t0);
+    setStatus(`Matched ${card.name} (${card.set_name}) in ${elapsed} ms.`, 'ok');
   } catch (e) {
     setStatus(e.message || String(e), 'error');
   } finally {
@@ -1431,12 +1608,14 @@ async function doManualLookup() {
     setStatus('Type a card name first.', 'error');
     return;
   }
+  const t0 = performance.now();
   try {
     setStatus(`Searching Scryfall for “${q}”…`);
     const card = await scryfallLookup(q);
-    await pushScan(card);
+    pushScan(card); // fire-and-forget — don't make the user wait on the network sync
     showPhoneResult(card);
-    setStatus(`Matched ${card.name} (${card.set_name}).`, 'ok');
+    const elapsed = Math.round(performance.now() - t0);
+    setStatus(`Matched ${card.name} (${card.set_name}) in ${elapsed} ms.`, 'ok');
     input.value = '';
   } catch (e) {
     setStatus(e.message || String(e), 'error');
