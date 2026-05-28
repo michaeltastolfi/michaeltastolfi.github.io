@@ -437,6 +437,71 @@
     color: var(--ink);
     text-shadow: 1px 1px 0 rgba(255,255,255,0.4);
   }
+
+  /* ── DEBUG: remove later ── manual lifetime-count setter ── */
+  .debug-set {
+    position: absolute;
+    bottom: 90px;
+    right: 16px;
+    display: flex;
+    gap: 4px;
+    z-index: 20;
+  }
+  .debug-set input {
+    width: 70px;
+    background: #2a2554;
+    color: var(--paper);
+    border: none;
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+    padding: 4px 6px;
+    outline: none;
+    box-shadow:
+      0 0 0 3px var(--ink),
+      3px 3px 0 3px rgba(0,0,0,0.45);
+  }
+  .debug-set input::-webkit-outer-spin-button,
+  .debug-set input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .debug-set input[type=number] { -moz-appearance: textfield; }
+  .debug-set .set-btn {
+    background: #2a2554;
+    color: var(--paper);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    padding: 6px 10px;
+    border: none;
+    cursor: pointer;
+    text-shadow: 1px 1px 0 var(--ink);
+    box-shadow:
+      0 0 0 3px var(--ink),
+      3px 3px 0 3px rgba(0,0,0,0.45);
+  }
+  .debug-set .set-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow:
+      0 0 0 3px var(--ink),
+      1px 1px 0 3px rgba(0,0,0,0.45);
+  }
+
+  /* ── PORTRAIT / TALL VIEWPORTS ── */
+  /* On narrow screens the strict 800×200 aspect ratio leaves the snow band
+     too small relative to the viewport, so the penguin floats above it.
+     Switch to background-size:cover with bottom-center positioning so the
+     foreground snow scales up to reach the penguin's feet. Mountains get
+     cropped on the sides but stay proportional vertically. */
+  @media (max-aspect-ratio: 1/1) {
+    .landscape {
+      aspect-ratio: auto;
+      height: 40%;
+      max-height: none;
+      background-size: cover;
+      background-position: bottom center;
+    }
+  }
 </style>
 </head>
 <body>
@@ -484,6 +549,12 @@
   <footer>
     <span class="arrow">&gt;</span>TAP THE PENGUIN
   </footer>
+
+  <!-- DEBUG: remove later -->
+  <div class="debug-set">
+    <input type="number" id="set-count-input" placeholder="set #" min="0" inputmode="numeric" />
+    <button class="set-btn" id="set-count-btn">SET</button>
+  </div>
 
   <button class="reset-btn" id="reset-btn">RESET</button>
 
@@ -580,11 +651,31 @@
   }
 
   // ─── AUDIO ─────────────────────────────────────────────────
+  // Web Audio routes to whatever audio output the OS has selected (including
+  // Bluetooth headphones) — but on mobile, particularly iOS, the AudioContext
+  // starts in 'suspended' state and the very first sound is sometimes silent.
+  // We (1) call resume() defensively on every access, (2) prime the context
+  // with a silent buffer on creation to "unlock" audio.
   let audioCtx = null;
   function getAudio() {
     if (!audioCtx) {
-      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // Prime with a silent buffer so the first real sound isn't dropped.
+        try {
+          const silentBuffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+          const source = audioCtx.createBufferSource();
+          source.buffer = silentBuffer;
+          source.connect(audioCtx.destination);
+          source.start(0);
+        } catch (e) {}
+      }
       catch (e) { return null; }
+    }
+    // If context got suspended (e.g., backgrounded the page), resume it.
+    // resume() returns a promise but for short sounds this is fine to fire-and-forget.
+    if (audioCtx.state === 'suspended') {
+      try { audioCtx.resume(); } catch (e) {}
     }
     return audioCtx;
   }
@@ -861,11 +952,29 @@
     setTimeout(returnToIdle, 600);
   }
 
+  // Track event timing to dedupe pointerdown -> click pairs.
+  // We listen to both pointerdown (modern) and click (fallback for unusual
+  // input devices that may only emit click events, like some assistive tech
+  // or wearable display browsers). When both fire for the same interaction,
+  // the click is suppressed.
+  let lastEventTime = 0;
+  let lastEventWasPointer = false;
+
   function handleBop(event) {
     if (event.target.closest('.reset-btn')) return;
+    if (event.target.closest('.debug-set')) return;  // DEBUG: remove later
+
+    // Dedupe: if a pointerdown just fired, ignore the synthetic click that follows.
+    const now = Date.now();
+    if (event.type === 'click' && lastEventWasPointer && now - lastEventTime < 600) {
+      lastEventWasPointer = false;
+      return;
+    }
+    lastEventTime = now;
+    lastEventWasPointer = (event.type === 'pointerdown');
+
     if (isFallen) { recoverEarly(); return; }
 
-    const now = Date.now();
     recentBops.push(now);
     recentBops = recentBops.filter(t => now - t < 2500);
 
@@ -949,7 +1058,61 @@
     }
   });
 
+  // Listen to both pointerdown and click. pointerdown handles modern devices
+  // (mouse, touch, pen). click acts as a fallback for input devices that may
+  // not emit pointer events through the browser's event pipeline. The dedupe
+  // in handleBop prevents double-firing.
   document.addEventListener('pointerdown', handleBop);
+  document.addEventListener('click', handleBop);
+
+  // ─── DEBUG: manual lifetime-count setter (remove later) ──────
+  const setCountInput = $('set-count-input');
+  const setCountBtn = $('set-count-btn');
+  function applySetCount() {
+    const val = parseInt(setCountInput.value, 10);
+    if (isNaN(val) || val < 0) {
+      setCountInput.value = '';
+      return;
+    }
+    totalCount = val;
+    saveTotal();
+    updateCounters();
+    setCountInput.value = '';
+    showReaction('Set to ' + val.toLocaleString() + '!', 1500);
+  }
+  setCountBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    applySetCount();
+  });
+  setCountInput.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applySetCount();
+    }
+  });
+  // Prevent any interaction with the debug controls from bubbling up as a bop.
+  ['pointerdown', 'click', 'touchstart', 'mousedown'].forEach(evt => {
+    setCountInput.addEventListener(evt, (e) => e.stopPropagation());
+    setCountBtn.addEventListener(evt, (e) => e.stopPropagation());
+  });
+  // ─── END DEBUG ──────
+
+  // Keyboard fallback: some unusual browsers (assistive tech, wearable display
+  // devices) may primarily emit keyboard events. Space and Enter trigger a bop.
+  document.addEventListener('keydown', (e) => {
+    if (e.target === setCountInput) return;  // don't intercept while typing in debug box
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      // Synthesize a centered event for the spark/particle origins.
+      handleBop({
+        target: document.body,
+        clientX: window.innerWidth / 2,
+        clientY: window.innerHeight / 2,
+        type: 'keydown'
+      });
+    }
+  });
 
   makeStars();
   makeSnow();
