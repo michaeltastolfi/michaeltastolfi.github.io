@@ -155,9 +155,15 @@
     top: 92px; left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 14px;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
     z-index: 15;
     pointer-events: none;
+  }
+  .stats-row {
+    display: flex;
+    gap: 14px;
   }
   .stat {
     background: #2a2554;
@@ -189,6 +195,66 @@
     33%  { transform: scale(1.3); color: var(--amber); }
     66%  { transform: scale(1.1); color: var(--hot); }
     100% { transform: scale(1);   color: var(--paper); }
+  }
+
+  /* ── PROGRESS PANEL ── next achievement bar ── */
+  /* Width matches the combined width of the two stat boxes above
+     (92 + 14 gap + 92 = 198, plus a hair extra). */
+  .progress-panel {
+    background: #2a2554;
+    padding: 7px 12px 7px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 200px;
+    box-shadow:
+      0 0 0 3px var(--ink),
+      4px 4px 0 3px rgba(0,0,0,0.45);
+  }
+  .progress-label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    color: var(--amber);
+    letter-spacing: 0.1em;
+    text-shadow: 1px 1px 0 var(--ink);
+    flex-shrink: 0;
+  }
+  .progress-track {
+    flex: 1;
+    height: 10px;
+    background: #1a1426;
+    box-shadow: inset 0 1px 0 rgba(0,0,0,0.6);
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-fill {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    background: var(--amber);
+    width: 0%;
+    /* Chunky stepped fill matches the rest of the game's pixel-art animation
+       language. 8 visible steps over 0.4s. */
+    transition: width 0.4s steps(8);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  /* Brief flash when the bar hits 100% (just before a threshold celebration) */
+  .progress-fill.flash {
+    animation: progress-flash 0.4s steps(4);
+  }
+  @keyframes progress-flash {
+    0%, 100% { background: var(--amber); }
+    50%      { background: #ffffff; }
+  }
+  .progress-threshold {
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--amber);
+    text-shadow: 1px 1px 0 var(--ink);
+    letter-spacing: 0.04em;
+    min-width: 56px;
+    text-align: right;
+    flex-shrink: 0;
   }
 
   /* ── PENGUIN ── */
@@ -487,6 +553,138 @@
       1px 1px 0 3px rgba(0,0,0,0.45);
   }
 
+  /* ── ACHIEVEMENT PLANETS ── arc above the penguin ── */
+  .planet-arc-slot {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    z-index: 1;
+    opacity: 0;
+    /* translate(-50%,-50%) centers the planet on its position coords */
+    transform: translate(-50%, -50%) scale(0);
+    transition: opacity 0.4s, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    image-rendering: pixelated;
+    pointer-events: none;
+    filter: drop-shadow(0 0 6px rgba(255, 245, 216, 0.15));
+  }
+  .planet-arc-slot.unlocked {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .planet-arc-slot svg { width: 100%; height: 100%; display: block; }
+
+  /* Arc positions: peak above the penguin's head, sweeping down to either side.
+     The arc curves below the header/counter and above the penguin. */
+  .planet-slot-0  { left:  6%; top: 38%; }
+  .planet-slot-1  { left: 15%; top: 32%; }
+  .planet-slot-2  { left: 24%; top: 28%; }
+  .planet-slot-3  { left: 32%; top: 25%; }
+  .planet-slot-4  { left: 41%; top: 23%; }
+  .planet-slot-5  { left: 50%; top: 22%; }
+  .planet-slot-6  { left: 59%; top: 23%; }
+  .planet-slot-7  { left: 68%; top: 25%; }
+  .planet-slot-8  { left: 76%; top: 28%; }
+  .planet-slot-9  { left: 85%; top: 32%; }
+  .planet-slot-10 { left: 94%; top: 38%; }
+
+  /* Celebrating: the dramatic pop-in animation for fresh unlocks */
+  .planet-arc-slot.celebrating {
+    animation: planet-pop-in 0.9s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes planet-pop-in {
+    0%   { transform: translate(-50%, -50%) scale(0) rotate(-180deg); opacity: 0; }
+    30%  { opacity: 1; }
+    60%  { transform: translate(-50%, -50%) scale(1.4) rotate(15deg); opacity: 1; }
+    85%  { transform: translate(-50%, -50%) scale(0.9) rotate(-3deg); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; }
+  }
+
+  /* ── PLANET WIGGLE ── gentle stepped motion, same cadence family
+     as the star twinkle (4s steps). Applied to the inner SVG so it
+     composes with the slot's centering transform without conflicting. */
+  .planet-arc-slot.unlocked svg {
+    animation-name: planet-wiggle;
+    animation-duration: 4.4s;
+    animation-timing-function: steps(4);
+    animation-iteration-count: infinite;
+    animation-delay: var(--wiggle-delay, 0s);
+  }
+  @keyframes planet-wiggle {
+    0%   { transform: translate(0, 0)    rotate(0deg); }
+    25%  { transform: translate(0, -2px) rotate(1deg); }
+    50%  { transform: translate(0, 0)    rotate(0deg); }
+    75%  { transform: translate(0, 2px)  rotate(-1deg); }
+    100% { transform: translate(0, 0)    rotate(0deg); }
+  }
+  /* Staggered negative delays so the 11 planets don't all bob in lockstep —
+     each one starts at a different point in the cycle. CSS vars inherit, so
+     the inner SVG picks up the slot's delay. */
+  .planet-slot-0  { --wiggle-delay:  0s;   }
+  .planet-slot-1  { --wiggle-delay: -0.3s; }
+  .planet-slot-2  { --wiggle-delay: -0.9s; }
+  .planet-slot-3  { --wiggle-delay: -1.4s; }
+  .planet-slot-4  { --wiggle-delay: -2.1s; }
+  .planet-slot-5  { --wiggle-delay: -2.6s; }
+  .planet-slot-6  { --wiggle-delay: -3.3s; }
+  .planet-slot-7  { --wiggle-delay: -3.7s; }
+  .planet-slot-8  { --wiggle-delay: -1.1s; }
+  .planet-slot-9  { --wiggle-delay: -2.8s; }
+  .planet-slot-10 { --wiggle-delay: -0.5s; }
+
+  /* ── ACHIEVEMENT CELEBRATION EFFECTS ── */
+  /* Expanding shockwave ring */
+  .ach-ring {
+    position: absolute;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 2px solid #ffb84d;
+    pointer-events: none;
+    z-index: 100;
+    transform: translate(-50%, -50%) scale(0.5);
+    animation: ach-ring-expand 1s steps(8) forwards;
+    box-shadow: 0 0 16px rgba(255, 184, 77, 0.6);
+  }
+  @keyframes ach-ring-expand {
+    0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 1;   border-color: #fff5d8; }
+    50%  { transform: translate(-50%, -50%) scale(14);  opacity: 0.7; border-color: #ffb84d; }
+    100% { transform: translate(-50%, -50%) scale(22);  opacity: 0;   border-color: #ff6a8a; }
+  }
+
+  /* Colorful particle bursts */
+  .ach-spark {
+    position: absolute;
+    width: 4px; height: 4px;
+    pointer-events: none;
+    z-index: 100;
+    transform: translate(-50%, -50%);
+    animation: ach-spark-fly 1.4s steps(10) forwards;
+  }
+  @keyframes ach-spark-fly {
+    0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+    40%  { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.4); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx) * 1.2), calc(-50% + var(--dy) * 1.2 + 38px)) scale(0.4); opacity: 0; }
+  }
+
+  /* Lingering twinkles after the burst */
+  .ach-sparkle {
+    position: absolute;
+    width: 2px; height: 2px;
+    background: #fff;
+    pointer-events: none;
+    z-index: 100;
+    transform: translate(-50%, -50%);
+    box-shadow:
+      -2px 0 0 #fff, 2px 0 0 #fff,
+      0 -2px 0 #fff, 0 2px 0 #fff;
+    animation: ach-sparkle-twinkle 1.8s steps(6) forwards;
+  }
+  @keyframes ach-sparkle-twinkle {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+    20%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    60%  { opacity: 0.6; transform: translate(-50%, -50%) scale(1.4); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  }
+
   /* ── PORTRAIT / TALL VIEWPORTS ── */
   /* On narrow screens the strict 800×200 aspect ratio leaves the snow band
      too small relative to the viewport, so the penguin floats above it.
@@ -500,6 +698,11 @@
       max-height: none;
       background-size: cover;
       background-position: bottom center;
+    }
+    /* Planets shrink on narrow screens so the arc doesn't crowd. */
+    .planet-arc-slot {
+      width: 42px;
+      height: 42px;
     }
   }
 </style>
@@ -521,6 +724,222 @@
     <circle cx="17" cy="14" r="0.8" fill="#e8e0c0"/>
     <circle cx="15" cy="19" r="0.6" fill="#e8e0c0"/>
   </svg>
+  <!-- ─── ACHIEVEMENT PLANETS ── arc above the penguin ─── -->
+  <!-- Each appears when its threshold is crossed. -->
+
+  <div class="planet-arc-slot planet-slot-0" id="planet-mercury" data-threshold="100">
+    <svg viewBox="0 0 32 32" shape-rendering="crispEdges">
+      <circle cx="16" cy="16" r="15" fill="#c4b8a4" opacity="0.06"/>
+      <circle cx="16" cy="16" r="12" fill="#c4b8a4" opacity="0.10"/>
+      <circle cx="16" cy="16" r="9" fill="#a89c8a"/>
+      <circle cx="14" cy="14" r="7" fill="#bdb09a"/>
+      <circle cx="13" cy="13" r="1.2" fill="#6a5e4c"/>
+      <circle cx="19" cy="17" r="1.5" fill="#6a5e4c"/>
+      <circle cx="17" cy="20" r="0.9" fill="#6a5e4c"/>
+      <circle cx="20" cy="14" r="0.7" fill="#6a5e4c"/>
+      <circle cx="15" cy="18" r="0.6" fill="#6a5e4c"/>
+      <circle cx="11" cy="17" r="0.5" fill="#6a5e4c"/>
+    </svg>
+  </div>
+
+  <div class="planet-arc-slot planet-slot-1" id="planet-venus" data-threshold="1000">
+    <svg viewBox="0 0 32 32" shape-rendering="crispEdges">
+      <defs><clipPath id="cVenus"><circle cx="16" cy="16" r="9"/></clipPath></defs>
+      <circle cx="16" cy="16" r="15" fill="#f5e8b8" opacity="0.07"/>
+      <circle cx="16" cy="16" r="12" fill="#f5e8b8" opacity="0.12"/>
+      <circle cx="16" cy="16" r="9" fill="#e8c878"/>
+      <g clip-path="url(#cVenus)">
+        <circle cx="14" cy="14" r="7" fill="#f0d894"/>
+        <ellipse cx="16" cy="12" rx="10" ry="0.7" fill="#a8804c" opacity="0.5"/>
+        <ellipse cx="16" cy="15" rx="10" ry="0.5" fill="#a8804c" opacity="0.4"/>
+        <ellipse cx="16" cy="18" rx="10" ry="0.7" fill="#a8804c" opacity="0.5"/>
+        <ellipse cx="16" cy="20" rx="10" ry="0.5" fill="#a8804c" opacity="0.4"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="planet-arc-slot planet-slot-2" id="planet-earth" data-threshold="5000">
+    <svg viewBox="0 0 32 32" shape-rendering="crispEdges">
+      <defs><clipPath id="cEarth"><circle cx="16" cy="16" r="9"/></clipPath></defs>
+      <circle cx="16" cy="16" r="15" fill="#7eb0e8" opacity="0.08"/>
+      <circle cx="16" cy="16" r="12" fill="#7eb0e8" opacity="0.13"/>
+      <circle cx="16" cy="16" r="9" fill="#3b6db5"/>
+      <g clip-path="url(#cEarth)">
+        <circle cx="14" cy="14" r="7" fill="#4f88cf"/>
+        <ellipse cx="13" cy="12" rx="2.2" ry="1.3" fill="#4a8a3a"/>
+        <ellipse cx="19" cy="14" rx="1.8" ry="2.2" fill="#4a8a3a"/>
+        <ellipse cx="14" cy="19" rx="2.5" ry="1" fill="#4a8a3a"/>
+        <ellipse cx="20" cy="20" rx="1.2" ry="0.8" fill="#4a8a3a"/>
+        <circle cx="11" cy="17" r="0.8" fill="#4a8a3a"/>
+        <ellipse cx="17" cy="11" rx="1.2" ry="0.5" fill="#ffffff" opacity="0.85"/>
+        <ellipse cx="12" cy="20" rx="1" ry="0.4" fill="#ffffff" opacity="0.85"/>
+        <circle cx="21" cy="17" r="0.5" fill="#ffffff" opacity="0.85"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="planet-arc-slot planet-slot-3" id="planet-mars" data-threshold="10000">
+    <svg viewBox="0 0 32 32" shape-rendering="crispEdges">
+      <defs><clipPath id="cMars"><circle cx="16" cy="16" r="9"/></clipPath></defs>
+      <circle cx="16" cy="16" r="15" fill="#e89868" opacity="0.07"/>
+      <circle cx="16" cy="16" r="12" fill="#e89868" opacity="0.12"/>
+      <circle cx="16" cy="16" r="9" fill="#b8543a"/>
+      <g clip-path="url(#cMars)">
+        <circle cx="14" cy="14" r="7" fill="#ce6a4a"/>
+        <ellipse cx="14" cy="17" rx="3" ry="1.2" fill="#7a2e1a"/>
+        <ellipse cx="19" cy="15" rx="1.4" ry="2" fill="#7a2e1a"/>
+        <circle cx="12" cy="14" r="0.9" fill="#7a2e1a"/>
+        <circle cx="20" cy="19" r="0.8" fill="#7a2e1a"/>
+        <ellipse cx="16" cy="8.5" rx="3" ry="1" fill="#f0e8d8"/>
+        <ellipse cx="16" cy="23" rx="2.2" ry="0.7" fill="#f0e8d8"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="planet-arc-slot planet-slot-4" id="planet-asteroid" data-threshold="20000">
+    <svg viewBox="0 0 32 32" shape-rendering="crispEdges">
+      <circle cx="16" cy="16" r="14" fill="#a89c8a" opacity="0.05"/>
+      <circle cx="16" cy="16" r="11" fill="#a89c8a" opacity="0.08"/>
+      <polygon points="10,11 14,8 18,9 22,11 24,14 23,18 22,22 18,24 14,23 11,21 8,17 9,13" fill="#6a5e4e"/>
+      <polygon points="11,11 14,9 18,10 20,12 19,17 16,18 13,17 11,15" fill="#8a7e6e"/>
+      <polygon points="13,9 17,9 19,10 16,11 13,10" fill="#a89c8a"/>
+      <circle cx="13" cy="14" r="1.4" fill="#3a2e22"/>
+      <circle cx="13" cy="14" r="0.7" fill="#5a4e42"/>
+      <circle cx="17" cy="13" r="0.8" fill="#3a2e22"/>
+      <circle cx="20" cy="17" r="1" fill="#3a2e22"/>
+      <circle cx="20" cy="17" r="0.5" fill="#5a4e42"/>
+      <circle cx="14" cy="20" r="0.7" fill="#3a2e22"/>
+      <circle cx="18" cy="21" r="0.5" fill="#3a2e22"/>
+    </svg>
+  </div>
+
+  <div class="planet-arc-slot planet-slot-5" id="planet-jupiter" data-threshold="35000">
+    <svg viewBox="0 0 32 32" shape-rendering="crispEdges">
+      <defs><clipPath id="cJup"><circle cx="16" cy="16" r="11"/></clipPath></defs>
+      <circle cx="16" cy="16" r="15" fill="#e8c498" opacity="0.07"/>
+      <circle cx="16" cy="16" r="13" fill="#e8c498" opacity="0.12"/>
+      <circle cx="16" cy="16" r="11" fill="#c89868"/>
+      <g clip-path="url(#cJup)">
+        <circle cx="14" cy="14" r="9" fill="#d8a878"/>
+        <ellipse cx="16" cy="10" rx="12" ry="0.8" fill="#8a5e3a" opacity="0.6"/>
+        <ellipse cx="16" cy="12" rx="12" ry="0.5" fill="#f0d4a0" opacity="0.4"/>
+        <ellipse cx="16" cy="14" rx="12" ry="0.7" fill="#8a5e3a" opacity="0.55"/>
+        <ellipse cx="16" cy="16" rx="12" ry="0.4" fill="#f0d4a0" opacity="0.4"/>
+        <ellipse cx="16" cy="18" rx="12" ry="0.7" fill="#8a5e3a" opacity="0.55"/>
+        <ellipse cx="16" cy="20" rx="12" ry="0.5" fill="#f0d4a0" opacity="0.4"/>
+        <ellipse cx="16" cy="22" rx="12" ry="0.8" fill="#8a5e3a" opacity="0.6"/>
+        <ellipse cx="19" cy="18" rx="2" ry="1.1" fill="#a8442a"/>
+        <ellipse cx="19" cy="18" rx="1.3" ry="0.7" fill="#c45a3a"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="planet-arc-slot planet-slot-6" id="planet-saturn" data-threshold="50000">
+    <svg viewBox="0 0 32 32" shape-rendering="crispEdges">
+      <defs>
+        <clipPath id="cSatRingBack"><rect x="0" y="0" width="32" height="16"/></clipPath>
+        <clipPath id="cSatRingFront"><rect x="0" y="16" width="32" height="16"/></clipPath>
+        <clipPath id="cSatBody"><circle cx="16" cy="16" r="7.5"/></clipPath>
+      </defs>
+      <circle cx="16" cy="16" r="15" fill="#e8c478" opacity="0.06"/>
+      <g clip-path="url(#cSatRingBack)">
+        <ellipse cx="16" cy="16" rx="14" ry="3.2" stroke="#a08048" stroke-width="1" fill="none"/>
+        <ellipse cx="16" cy="16" rx="11.5" ry="2.3" stroke="#e8c89c" stroke-width="0.6" fill="none"/>
+      </g>
+      <circle cx="16" cy="16" r="7.5" fill="#d8a868"/>
+      <g clip-path="url(#cSatBody)">
+        <circle cx="14.5" cy="14.5" r="6" fill="#e8c084"/>
+        <ellipse cx="16" cy="13" rx="8" ry="0.4" fill="#a87830" opacity="0.5"/>
+        <ellipse cx="16" cy="15" rx="8" ry="0.3" fill="#a87830" opacity="0.4"/>
+        <ellipse cx="16" cy="17.5" rx="8" ry="0.5" fill="#a87830" opacity="0.5"/>
+        <ellipse cx="16" cy="19.5" rx="8" ry="0.4" fill="#a87830" opacity="0.4"/>
+      </g>
+      <g clip-path="url(#cSatRingFront)">
+        <ellipse cx="16" cy="16" rx="14" ry="3.2" stroke="#a08048" stroke-width="1" fill="none"/>
+        <ellipse cx="16" cy="16" rx="11.5" ry="2.3" stroke="#e8c89c" stroke-width="0.6" fill="none"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="planet-arc-slot planet-slot-7" id="planet-uranus" data-threshold="75000">
+    <svg viewBox="0 0 32 32" shape-rendering="crispEdges">
+      <defs>
+        <clipPath id="cUraRingBack"><rect x="0" y="0" width="16" height="32"/></clipPath>
+        <clipPath id="cUraRingFront"><rect x="16" y="0" width="16" height="32"/></clipPath>
+        <clipPath id="cUraBody"><circle cx="16" cy="16" r="8"/></clipPath>
+      </defs>
+      <circle cx="16" cy="16" r="15" fill="#a8dce8" opacity="0.07"/>
+      <circle cx="16" cy="16" r="12" fill="#a8dce8" opacity="0.10"/>
+      <g clip-path="url(#cUraRingBack)">
+        <ellipse cx="16" cy="16" rx="2.8" ry="12" stroke="#6a98a4" stroke-width="0.6" fill="none"/>
+      </g>
+      <circle cx="16" cy="16" r="8" fill="#7ec0cc"/>
+      <g clip-path="url(#cUraBody)">
+        <circle cx="14.5" cy="14.5" r="6.5" fill="#a4d8e0"/>
+        <ellipse cx="16" cy="13" rx="8" ry="0.3" fill="#5a8a98" opacity="0.4"/>
+        <ellipse cx="16" cy="19" rx="8" ry="0.3" fill="#5a8a98" opacity="0.4"/>
+      </g>
+      <g clip-path="url(#cUraRingFront)">
+        <ellipse cx="16" cy="16" rx="2.8" ry="12" stroke="#6a98a4" stroke-width="0.6" fill="none"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="planet-arc-slot planet-slot-8" id="planet-neptune" data-threshold="100000">
+    <svg viewBox="0 0 32 32" shape-rendering="crispEdges">
+      <defs><clipPath id="cNep"><circle cx="16" cy="16" r="8"/></clipPath></defs>
+      <circle cx="16" cy="16" r="15" fill="#6a8ad4" opacity="0.08"/>
+      <circle cx="16" cy="16" r="12" fill="#6a8ad4" opacity="0.12"/>
+      <circle cx="16" cy="16" r="8" fill="#3a5ab4"/>
+      <g clip-path="url(#cNep)">
+        <circle cx="14.5" cy="14.5" r="6.5" fill="#5074c8"/>
+        <ellipse cx="16" cy="12" rx="9" ry="0.5" fill="#1e2e84" opacity="0.5"/>
+        <ellipse cx="16" cy="19" rx="9" ry="0.5" fill="#1e2e84" opacity="0.5"/>
+        <ellipse cx="13" cy="16" rx="1.8" ry="1.2" fill="#1e2e84"/>
+        <ellipse cx="18" cy="14" rx="1.5" ry="0.4" fill="#fff" opacity="0.55"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="planet-arc-slot planet-slot-9" id="planet-pluto" data-threshold="500000">
+    <svg viewBox="0 0 32 32" shape-rendering="crispEdges">
+      <defs><clipPath id="cPluto"><circle cx="16" cy="16" r="7"/></clipPath></defs>
+      <circle cx="16" cy="16" r="13" fill="#d8c4b0" opacity="0.06"/>
+      <circle cx="16" cy="16" r="11" fill="#d8c4b0" opacity="0.10"/>
+      <circle cx="16" cy="16" r="7" fill="#a88a76"/>
+      <g clip-path="url(#cPluto)">
+        <circle cx="14.5" cy="14.5" r="5.5" fill="#bc9e88"/>
+        <circle cx="17" cy="17.5" r="1.5" fill="#f0dcc4"/>
+        <circle cx="19.2" cy="17.5" r="1.5" fill="#f0dcc4"/>
+        <polygon points="15.5,18 20.7,18 18.1,21" fill="#f0dcc4"/>
+        <ellipse cx="13" cy="14.5" rx="1.5" ry="1" fill="#5c4030"/>
+        <circle cx="14" cy="19" r="0.6" fill="#5c4030"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="planet-arc-slot planet-slot-10" id="planet-galaxy" data-threshold="1000000">
+    <svg viewBox="0 0 32 32" shape-rendering="crispEdges">
+      <circle cx="16" cy="16" r="15" fill="#9080c0" opacity="0.08"/>
+      <circle cx="16" cy="16" r="13" fill="#a090d0" opacity="0.10"/>
+      <ellipse cx="16" cy="16" rx="12" ry="10" fill="#6a5894" opacity="0.20"/>
+      <path d="M 4,16 Q 6,9 13,9 Q 19,9 22,12" stroke="#c4b0e0" stroke-width="1.2" fill="none" opacity="0.75"/>
+      <path d="M 28,16 Q 26,23 19,23 Q 13,23 10,20" stroke="#c4b0e0" stroke-width="1.2" fill="none" opacity="0.75"/>
+      <path d="M 9,12 Q 13,9 17,11" stroke="#e0d0f0" stroke-width="0.7" fill="none" opacity="0.7"/>
+      <path d="M 23,20 Q 19,23 15,21" stroke="#e0d0f0" stroke-width="0.7" fill="none" opacity="0.7"/>
+      <ellipse cx="16" cy="16" rx="4.5" ry="3" fill="#d8b878" opacity="0.55"/>
+      <ellipse cx="16" cy="16" rx="3" ry="2" fill="#f0d090"/>
+      <ellipse cx="16" cy="16" rx="1.8" ry="1.2" fill="#fff0c8"/>
+      <circle cx="16" cy="16" r="0.7" fill="#ffffff"/>
+      <circle cx="5" cy="6" r="0.4" fill="#fff"/>
+      <circle cx="27" cy="7" r="0.3" fill="#fff"/>
+      <circle cx="9" cy="27" r="0.3" fill="#fff"/>
+      <circle cx="25" cy="26" r="0.4" fill="#fff"/>
+      <circle cx="3" cy="20" r="0.3" fill="#fff"/>
+      <circle cx="29" cy="13" r="0.3" fill="#fff"/>
+    </svg>
+  </div>
+
   <div class="landscape"></div>
 
   <header>
@@ -529,13 +948,22 @@
   </header>
 
   <div class="counter-panel">
-    <div class="stat">
-      <div class="stat-label">SESSION</div>
-      <div class="stat-value" id="session-count">0</div>
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-label">SESSION</div>
+        <div class="stat-value" id="session-count">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">ALL TIME</div>
+        <div class="stat-value" id="total-count">---</div>
+      </div>
     </div>
-    <div class="stat">
-      <div class="stat-label">ALL TIME</div>
-      <div class="stat-value" id="total-count">---</div>
+    <div class="progress-panel">
+      <div class="progress-label">NEXT</div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="progress-threshold" id="progress-threshold">100</div>
     </div>
   </div>
 
@@ -632,12 +1060,16 @@
         if (r && r.value) {
           totalCount = parseInt(r.value, 10) || 0;
           totalEl.textContent = totalCount.toLocaleString();
+          syncAchievementsSilently();
+          updateProgressBar();
         }
       }).catch(() => {});
       return;
     }
     totalCount = parseInt(value, 10) || 0;
     totalEl.textContent = totalCount.toLocaleString();
+    syncAchievementsSilently();
+    updateProgressBar();
   }
   function saveTotal() {
     try {
@@ -727,6 +1159,214 @@
     osc.connect(gain).connect(ctx.destination);
     osc.start(now);
     osc.stop(now + 0.32);
+  }
+
+  // ─── ACHIEVEMENT FANFARE ─────────────────────────────────────
+  // Triumphant ascending arpeggio in C major + sparkle on top.
+  function playAchievement() {
+    const ctx = getAudio(); if (!ctx) return;
+    const now = ctx.currentTime;
+    // C5, E5, G5, C6, E6, G6 — major arpeggio across two octaves
+    const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1568.00];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = freq;
+      const t = now + i * 0.07;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.12, t + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.42);
+    });
+    // Sparkly high glissando layered on top
+    const oscS = ctx.createOscillator();
+    const gainS = ctx.createGain();
+    oscS.type = 'triangle';
+    oscS.frequency.setValueAtTime(2000, now + 0.2);
+    oscS.frequency.exponentialRampToValueAtTime(4200, now + 0.55);
+    gainS.gain.setValueAtTime(0.0001, now + 0.2);
+    gainS.gain.exponentialRampToValueAtTime(0.06, now + 0.22);
+    gainS.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+    oscS.connect(gainS).connect(ctx.destination);
+    oscS.start(now + 0.2);
+    oscS.stop(now + 0.62);
+  }
+
+  // ─── ACHIEVEMENT SYSTEM ──────────────────────────────────────
+  // Each planet unlocks when totalCount crosses its threshold.
+  // The element ids match `planet-{name}` and the markup carries data-threshold
+  // so the array below is the single source of truth.
+  const ACHIEVEMENTS = [
+    { id: 'mercury',  threshold: 100,     name: 'Mercury'   },
+    { id: 'venus',    threshold: 1000,    name: 'Venus'     },
+    { id: 'earth',    threshold: 5000,    name: 'Earth'     },
+    { id: 'mars',     threshold: 10000,   name: 'Mars'      },
+    { id: 'asteroid', threshold: 20000,   name: 'Asteroid'  },
+    { id: 'jupiter',  threshold: 35000,   name: 'Jupiter'   },
+    { id: 'saturn',   threshold: 50000,   name: 'Saturn'    },
+    { id: 'uranus',   threshold: 75000,   name: 'Uranus'    },
+    { id: 'neptune',  threshold: 100000,  name: 'Neptune'   },
+    { id: 'pluto',    threshold: 500000,  name: 'Pluto'     },
+    { id: 'galaxy',   threshold: 1000000, name: 'Milky Way' },
+  ];
+
+  // syncAchievementsSilently: set unlocked classes to match current totalCount,
+  // without any animation/sound/particles. Used on page load.
+  function syncAchievementsSilently() {
+    ACHIEVEMENTS.forEach(ach => {
+      const el = document.getElementById('planet-' + ach.id);
+      if (!el) return;
+      if (totalCount >= ach.threshold) el.classList.add('unlocked');
+      else el.classList.remove('unlocked');
+    });
+  }
+
+  // Staggered celebration: if multiple thresholds cross at once (e.g. via the
+  // debug setter jumping high), space the fanfares out so they don't pile up.
+  let nextCelebrationTime = 0;
+
+  function celebrateUnlock(planetEl) {
+    const now = performance.now();
+    const stagger = Math.max(0, nextCelebrationTime - now);
+    nextCelebrationTime = now + stagger + 280;
+
+    setTimeout(() => {
+      // Pop-in animation
+      planetEl.classList.add('unlocked');
+      planetEl.classList.add('celebrating');
+      setTimeout(() => planetEl.classList.remove('celebrating'), 950);
+
+      // Get the planet's screen position for particle origin
+      const rect = planetEl.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+
+      // 1. Shockwave ring
+      const ring = document.createElement('div');
+      ring.className = 'ach-ring';
+      ring.style.left = cx + 'px';
+      ring.style.top = cy + 'px';
+      document.body.appendChild(ring);
+      setTimeout(() => ring.remove(), 1100);
+
+      // 2. Colorful particle burst (mix of cross-shaped and star-shaped pixels)
+      const colors = ['#ffb84d', '#ff6a8a', '#7eb0e8', '#ffffff', '#c4b0e0', '#fffaea', '#fff5d8'];
+      const count = 26;
+      for (let i = 0; i < count; i++) {
+        const p = document.createElement('div');
+        const isStar = Math.random() < 0.35;
+        p.className = 'ach-spark';
+        const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+        const dist = 50 + Math.random() * 75;
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        p.style.background = color;
+        p.style.boxShadow = isStar
+          ? `-3px 0 0 ${color}, 3px 0 0 ${color}, 0 -3px 0 ${color}, 0 3px 0 ${color}, -6px 0 0 ${color}, 6px 0 0 ${color}, 0 -6px 0 ${color}, 0 6px 0 ${color}`
+          : `-3px 0 0 ${color}, 3px 0 0 ${color}, 0 -3px 0 ${color}, 0 3px 0 ${color}`;
+        p.style.left = cx + 'px';
+        p.style.top = cy + 'px';
+        p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+        p.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+        p.style.animationDelay = (Math.random() * 0.1) + 's';
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 1700);
+      }
+
+      // 3. Trailing twinkles scattered around the planet
+      for (let i = 0; i < 10; i++) {
+        const s = document.createElement('div');
+        s.className = 'ach-sparkle';
+        s.style.left = (cx + (Math.random() - 0.5) * 90) + 'px';
+        s.style.top = (cy + (Math.random() - 0.5) * 90) + 'px';
+        s.style.animationDelay = (Math.random() * 0.6) + 's';
+        document.body.appendChild(s);
+        setTimeout(() => s.remove(), 2500);
+      }
+
+      playAchievement();
+    }, stagger);
+  }
+
+  // checkAchievementCrossings: called after totalCount changes. Fires the
+  // celebration for any newly-crossed thresholds and silently hides any
+  // planets whose threshold the new count is now below (e.g. after reset).
+  function checkAchievementCrossings(prevTotal, newTotal) {
+    ACHIEVEMENTS.forEach(ach => {
+      const el = document.getElementById('planet-' + ach.id);
+      if (!el) return;
+      const crossedUp   = prevTotal <  ach.threshold && newTotal >= ach.threshold;
+      const crossedDown = prevTotal >= ach.threshold && newTotal <  ach.threshold;
+      if (crossedUp) {
+        celebrateUnlock(el);
+      } else if (crossedDown) {
+        el.classList.remove('unlocked');
+        el.classList.remove('celebrating');
+      }
+    });
+  }
+
+  // ─── PROGRESS BAR ────────────────────────────────────────────
+  // Shows progress from the *last unlocked* threshold to the *next* threshold,
+  // so the bar resets to empty each time the player crosses one. When the bar
+  // crosses upward (a new stage begins), we snap-reset the width to 0% without
+  // a transition, so it doesn't slide backwards across the screen.
+  const progressFillEl  = document.getElementById('progress-fill');
+  const progressLabelEl = document.getElementById('progress-threshold');
+  // Tracks which "stage" we were last in so we can detect a forward crossing.
+  let lastProgressStartThreshold;  // undefined initially
+
+  function updateProgressBar() {
+    const next = ACHIEVEMENTS.find(ach => totalCount < ach.threshold);
+
+    if (!next) {
+      // All achievements unlocked — bar is fully filled forever.
+      progressFillEl.style.transition = '';
+      progressFillEl.style.width = '100%';
+      progressLabelEl.textContent = 'MAX!';
+      lastProgressStartThreshold = Infinity;
+      return;
+    }
+
+    // Find the last threshold the player has *already* crossed (or 0 if none).
+    const lastUnlocked = [...ACHIEVEMENTS].reverse().find(ach => totalCount >= ach.threshold);
+    const startThreshold = lastUnlocked ? lastUnlocked.threshold : 0;
+    const range    = next.threshold - startThreshold;
+    const progress = totalCount       - startThreshold;
+    const pct      = Math.min(100, Math.max(0, (progress / range) * 100));
+
+    // Detect a *forward* stage transition (player crossed a threshold).
+    // Going backwards (reset / debug-set down) doesn't snap — it animates.
+    const movedForward = lastProgressStartThreshold !== undefined
+                      && startThreshold > lastProgressStartThreshold;
+
+    if (movedForward) {
+      // Snap-reset to 0% without transition, then animate up to the new pct.
+      progressFillEl.style.transition = 'none';
+      progressFillEl.style.width = '0%';
+      void progressFillEl.offsetHeight;  // force reflow
+      progressFillEl.style.transition = '';
+      requestAnimationFrame(() => {
+        progressFillEl.style.width = pct + '%';
+      });
+    } else {
+      progressFillEl.style.width = pct + '%';
+    }
+
+    // Flash the bar white briefly if we just hit 100% on the previous bop
+    // (i.e., the next threshold is *exactly* our current count). This gives
+    // the bar a tiny moment of fanfare right before the planet pops in.
+    if (totalCount + 1 === next.threshold) {
+      progressFillEl.classList.remove('flash');
+      void progressFillEl.offsetHeight;
+      progressFillEl.classList.add('flash');
+      setTimeout(() => progressFillEl.classList.remove('flash'), 420);
+    }
+
+    lastProgressStartThreshold = startThreshold;
+    progressLabelEl.textContent = next.threshold.toLocaleString();
   }
 
   const reactions = {
@@ -979,9 +1619,12 @@
     recentBops = recentBops.filter(t => now - t < 2500);
 
     sessionCount += 1;
+    const prevTotal = totalCount;
     totalCount += 1;
     updateCounters();
     saveTotal();
+    checkAchievementCrossings(prevTotal, totalCount);
+    updateProgressBar();
     playBop(recentBops.length);
 
     const x = event.clientX || (event.touches && event.touches[0].clientX) || window.innerWidth / 2;
@@ -1047,10 +1690,13 @@
     clearTimeout(resetTimer);
     resetBtn.textContent = 'RESET';
     resetBtn.classList.remove('armed');
+    const prevTotalForReset = totalCount;
     totalCount = 0;
     sessionCount = 0;
     saveTotal();
     updateCounters();
+    checkAchievementCrossings(prevTotalForReset, totalCount);
+    updateProgressBar();
     showReaction('Fresh start!', 1200);
     if (!isFallen) {
       setFrame('HAPPY');
@@ -1074,9 +1720,12 @@
       setCountInput.value = '';
       return;
     }
+    const prevTotalForSet = totalCount;
     totalCount = val;
     saveTotal();
     updateCounters();
+    checkAchievementCrossings(prevTotalForSet, totalCount);
+    updateProgressBar();
     setCountInput.value = '';
     showReaction('Set to ' + val.toLocaleString() + '!', 1500);
   }
