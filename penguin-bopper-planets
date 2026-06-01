@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Celestial Bodies Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    /* Same night-sky gradient as the game */
+    background: linear-gradient(180deg,
+      #07081a 0%,    #07081a 9%,
+      #0c0d22 9%,    #0c0d22 18%,
+      #11132c 18%,   #11132c 27%,
+      #161938 27%,   #161938 36%,
+      #1b1f43 36%,   #1b1f43 45%,
+      #1f254e 45%,   #1f254e 54%,
+      #232b5a 54%,   #232b5a 63%,
+      #283166 63%,   #283166 72%,
+      #2c3870 72%,   #2c3870 100%
+    );
+    min-height: 100vh;
+    padding: 40px 20px;
+    font-family: 'VT323', monospace;
+    color: #f7f1e0;
+  }
+
+  h1 {
+    text-align: center;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 18px;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    text-shadow:
+      2px 0 0 #1a1426, -2px 0 0 #1a1426,
+      0 2px 0 #1a1426, 0 -2px 0 #1a1426,
+      4px 4px 0 rgba(0,0,0,0.4);
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 20px;
+    opacity: 0.7;
+    margin-bottom: 40px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 800px;
+    margin: 0 auto;
+    gap: 20px;
+  }
+
+  .cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 10px;
+    background: rgba(0, 0, 0, 0.25);
+    box-shadow:
+      0 0 0 2px #1a1426,
+      3px 3px 0 2px rgba(0,0,0,0.4);
+  }
+
+  .body {
+    width: 80px;
+    height: 80px;
+    display: block;
+  }
+
+  .label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: #ffb84d;
+    letter-spacing: 0.08em;
+    text-shadow: 1px 1px 0 #1a1426;
+  }
+
+  .row-label {
+    grid-column: 1 / -1;
+    margin-top: 16px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    color: #ff6a8a;
+    letter-spacing: 0.1em;
+    text-align: center;
+    text-shadow: 2px 2px 0 #1a1426;
+    padding-top: 12px;
+    border-top: 2px solid rgba(255,255,255,0.1);
+  }
+  .row-label:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+
+  /* Stars sprinkled in background */
+  .star {
+    position: fixed;
+    width: 2px; height: 2px;
+    background: #fff;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .grid { position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+  <h1>CELESTIAL BODIES</h1>
+  <div class="subtitle">~ pixel-art set for penguin-bopper ~</div>
+
+  <div class="grid">
+
+    <div class="row-label">INNER ROCKY PLANETS</div>
+
+    <!-- ─── MERCURY ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <circle cx="16" cy="16" r="15" fill="#c4b8a4" opacity="0.06"/>
+        <circle cx="16" cy="16" r="12" fill="#c4b8a4" opacity="0.10"/>
+        <circle cx="16" cy="16" r="9" fill="#a89c8a"/>
+        <circle cx="14" cy="14" r="7" fill="#bdb09a"/>
+        <circle cx="13" cy="13" r="1.2" fill="#6a5e4c"/>
+        <circle cx="19" cy="17" r="1.5" fill="#6a5e4c"/>
+        <circle cx="17" cy="20" r="0.9" fill="#6a5e4c"/>
+        <circle cx="20" cy="14" r="0.7" fill="#6a5e4c"/>
+        <circle cx="15" cy="18" r="0.6" fill="#6a5e4c"/>
+        <circle cx="11" cy="17" r="0.5" fill="#6a5e4c"/>
+      </svg>
+      <div class="label">MERCURY</div>
+    </div>
+
+    <!-- ─── VENUS ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <defs>
+          <clipPath id="venusClip"><circle cx="16" cy="16" r="9"/></clipPath>
+        </defs>
+        <circle cx="16" cy="16" r="15" fill="#f5e8b8" opacity="0.07"/>
+        <circle cx="16" cy="16" r="12" fill="#f5e8b8" opacity="0.12"/>
+        <circle cx="16" cy="16" r="9" fill="#e8c878"/>
+        <g clip-path="url(#venusClip)">
+          <circle cx="14" cy="14" r="7" fill="#f0d894"/>
+          <ellipse cx="16" cy="12" rx="10" ry="0.7" fill="#a8804c" opacity="0.5"/>
+          <ellipse cx="16" cy="15" rx="10" ry="0.5" fill="#a8804c" opacity="0.4"/>
+          <ellipse cx="16" cy="18" rx="10" ry="0.7" fill="#a8804c" opacity="0.5"/>
+          <ellipse cx="16" cy="20" rx="10" ry="0.5" fill="#a8804c" opacity="0.4"/>
+        </g>
+      </svg>
+      <div class="label">VENUS</div>
+    </div>
+
+    <!-- ─── EARTH ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <defs>
+          <clipPath id="earthClip"><circle cx="16" cy="16" r="9"/></clipPath>
+        </defs>
+        <circle cx="16" cy="16" r="15" fill="#7eb0e8" opacity="0.08"/>
+        <circle cx="16" cy="16" r="12" fill="#7eb0e8" opacity="0.13"/>
+        <circle cx="16" cy="16" r="9" fill="#3b6db5"/>
+        <g clip-path="url(#earthClip)">
+          <circle cx="14" cy="14" r="7" fill="#4f88cf"/>
+          <!-- continents -->
+          <ellipse cx="13" cy="12" rx="2.2" ry="1.3" fill="#4a8a3a"/>
+          <ellipse cx="19" cy="14" rx="1.8" ry="2.2" fill="#4a8a3a"/>
+          <ellipse cx="14" cy="19" rx="2.5" ry="1" fill="#4a8a3a"/>
+          <ellipse cx="20" cy="20" rx="1.2" ry="0.8" fill="#4a8a3a"/>
+          <circle cx="11" cy="17" r="0.8" fill="#4a8a3a"/>
+          <!-- clouds -->
+          <ellipse cx="17" cy="11" rx="1.2" ry="0.5" fill="#ffffff" opacity="0.85"/>
+          <ellipse cx="12" cy="20" rx="1" ry="0.4" fill="#ffffff" opacity="0.85"/>
+          <circle cx="21" cy="17" r="0.5" fill="#ffffff" opacity="0.85"/>
+        </g>
+      </svg>
+      <div class="label">EARTH</div>
+    </div>
+
+    <!-- ─── MARS ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <defs>
+          <clipPath id="marsClip"><circle cx="16" cy="16" r="9"/></clipPath>
+        </defs>
+        <circle cx="16" cy="16" r="15" fill="#e89868" opacity="0.07"/>
+        <circle cx="16" cy="16" r="12" fill="#e89868" opacity="0.12"/>
+        <circle cx="16" cy="16" r="9" fill="#b8543a"/>
+        <g clip-path="url(#marsClip)">
+          <circle cx="14" cy="14" r="7" fill="#ce6a4a"/>
+          <!-- dark mares -->
+          <ellipse cx="14" cy="17" rx="3" ry="1.2" fill="#7a2e1a"/>
+          <ellipse cx="19" cy="15" rx="1.4" ry="2" fill="#7a2e1a"/>
+          <circle cx="12" cy="14" r="0.9" fill="#7a2e1a"/>
+          <circle cx="20" cy="19" r="0.8" fill="#7a2e1a"/>
+          <!-- polar caps -->
+          <ellipse cx="16" cy="8.5" rx="3" ry="1" fill="#f0e8d8"/>
+          <ellipse cx="16" cy="23" rx="2.2" ry="0.7" fill="#f0e8d8"/>
+        </g>
+      </svg>
+      <div class="label">MARS</div>
+    </div>
+
+    <div class="row-label">GAS &amp; ICE GIANTS</div>
+
+    <!-- ─── JUPITER ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <defs>
+          <clipPath id="jupClip"><circle cx="16" cy="16" r="11"/></clipPath>
+        </defs>
+        <circle cx="16" cy="16" r="15" fill="#e8c498" opacity="0.07"/>
+        <circle cx="16" cy="16" r="13" fill="#e8c498" opacity="0.12"/>
+        <circle cx="16" cy="16" r="11" fill="#c89868"/>
+        <g clip-path="url(#jupClip)">
+          <circle cx="14" cy="14" r="9" fill="#d8a878"/>
+          <!-- alternating bands -->
+          <ellipse cx="16" cy="10" rx="12" ry="0.8" fill="#8a5e3a" opacity="0.6"/>
+          <ellipse cx="16" cy="12" rx="12" ry="0.5" fill="#f0d4a0" opacity="0.4"/>
+          <ellipse cx="16" cy="14" rx="12" ry="0.7" fill="#8a5e3a" opacity="0.55"/>
+          <ellipse cx="16" cy="16" rx="12" ry="0.4" fill="#f0d4a0" opacity="0.4"/>
+          <ellipse cx="16" cy="18" rx="12" ry="0.7" fill="#8a5e3a" opacity="0.55"/>
+          <ellipse cx="16" cy="20" rx="12" ry="0.5" fill="#f0d4a0" opacity="0.4"/>
+          <ellipse cx="16" cy="22" rx="12" ry="0.8" fill="#8a5e3a" opacity="0.6"/>
+          <!-- Great Red Spot -->
+          <ellipse cx="19" cy="18" rx="2" ry="1.1" fill="#a8442a"/>
+          <ellipse cx="19" cy="18" rx="1.3" ry="0.7" fill="#c45a3a"/>
+        </g>
+      </svg>
+      <div class="label">JUPITER</div>
+    </div>
+
+    <!-- ─── SATURN ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <defs>
+          <clipPath id="ringBack"><rect x="0" y="0" width="32" height="16"/></clipPath>
+          <clipPath id="ringFront"><rect x="0" y="16" width="32" height="16"/></clipPath>
+          <clipPath id="satClip"><circle cx="16" cy="16" r="7.5"/></clipPath>
+        </defs>
+        <circle cx="16" cy="16" r="15" fill="#e8c478" opacity="0.06"/>
+
+        <!-- back half of rings -->
+        <g clip-path="url(#ringBack)">
+          <ellipse cx="16" cy="16" rx="14" ry="3.2" stroke="#a08048" stroke-width="1" fill="none"/>
+          <ellipse cx="16" cy="16" rx="11.5" ry="2.3" stroke="#e8c89c" stroke-width="0.6" fill="none"/>
+        </g>
+
+        <!-- planet -->
+        <circle cx="16" cy="16" r="7.5" fill="#d8a868"/>
+        <g clip-path="url(#satClip)">
+          <circle cx="14.5" cy="14.5" r="6" fill="#e8c084"/>
+          <ellipse cx="16" cy="13" rx="8" ry="0.4" fill="#a87830" opacity="0.5"/>
+          <ellipse cx="16" cy="15" rx="8" ry="0.3" fill="#a87830" opacity="0.4"/>
+          <ellipse cx="16" cy="17.5" rx="8" ry="0.5" fill="#a87830" opacity="0.5"/>
+          <ellipse cx="16" cy="19.5" rx="8" ry="0.4" fill="#a87830" opacity="0.4"/>
+        </g>
+
+        <!-- front half of rings -->
+        <g clip-path="url(#ringFront)">
+          <ellipse cx="16" cy="16" rx="14" ry="3.2" stroke="#a08048" stroke-width="1" fill="none"/>
+          <ellipse cx="16" cy="16" rx="11.5" ry="2.3" stroke="#e8c89c" stroke-width="0.6" fill="none"/>
+        </g>
+      </svg>
+      <div class="label">SATURN</div>
+    </div>
+
+    <!-- ─── URANUS ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <defs>
+          <clipPath id="uraRingBack"><rect x="0" y="0" width="16" height="32"/></clipPath>
+          <clipPath id="uraRingFront"><rect x="16" y="0" width="16" height="32"/></clipPath>
+          <clipPath id="uraClip"><circle cx="16" cy="16" r="8"/></clipPath>
+        </defs>
+        <circle cx="16" cy="16" r="15" fill="#a8dce8" opacity="0.07"/>
+        <circle cx="16" cy="16" r="12" fill="#a8dce8" opacity="0.10"/>
+
+        <!-- back half of (vertical) rings -->
+        <g clip-path="url(#uraRingBack)">
+          <ellipse cx="16" cy="16" rx="2.8" ry="12" stroke="#6a98a4" stroke-width="0.6" fill="none"/>
+        </g>
+
+        <circle cx="16" cy="16" r="8" fill="#7ec0cc"/>
+        <g clip-path="url(#uraClip)">
+          <circle cx="14.5" cy="14.5" r="6.5" fill="#a4d8e0"/>
+          <ellipse cx="16" cy="13" rx="8" ry="0.3" fill="#5a8a98" opacity="0.4"/>
+          <ellipse cx="16" cy="19" rx="8" ry="0.3" fill="#5a8a98" opacity="0.4"/>
+        </g>
+
+        <!-- front half of rings -->
+        <g clip-path="url(#uraRingFront)">
+          <ellipse cx="16" cy="16" rx="2.8" ry="12" stroke="#6a98a4" stroke-width="0.6" fill="none"/>
+        </g>
+      </svg>
+      <div class="label">URANUS</div>
+    </div>
+
+    <!-- ─── NEPTUNE ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <defs>
+          <clipPath id="nepClip"><circle cx="16" cy="16" r="8"/></clipPath>
+        </defs>
+        <circle cx="16" cy="16" r="15" fill="#6a8ad4" opacity="0.08"/>
+        <circle cx="16" cy="16" r="12" fill="#6a8ad4" opacity="0.12"/>
+        <circle cx="16" cy="16" r="8" fill="#3a5ab4"/>
+        <g clip-path="url(#nepClip)">
+          <circle cx="14.5" cy="14.5" r="6.5" fill="#5074c8"/>
+          <ellipse cx="16" cy="12" rx="9" ry="0.5" fill="#1e2e84" opacity="0.5"/>
+          <ellipse cx="16" cy="19" rx="9" ry="0.5" fill="#1e2e84" opacity="0.5"/>
+          <!-- great dark spot -->
+          <ellipse cx="13" cy="16" rx="1.8" ry="1.2" fill="#1e2e84"/>
+          <!-- bright streak -->
+          <ellipse cx="18" cy="14" rx="1.5" ry="0.4" fill="#fff" opacity="0.55"/>
+        </g>
+      </svg>
+      <div class="label">NEPTUNE</div>
+    </div>
+
+    <div class="row-label">EVERYTHING ELSE</div>
+
+    <!-- ─── PLUTO ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <defs>
+          <clipPath id="plutoClip"><circle cx="16" cy="16" r="7"/></clipPath>
+        </defs>
+        <circle cx="16" cy="16" r="13" fill="#d8c4b0" opacity="0.06"/>
+        <circle cx="16" cy="16" r="11" fill="#d8c4b0" opacity="0.10"/>
+        <circle cx="16" cy="16" r="7" fill="#a88a76"/>
+        <g clip-path="url(#plutoClip)">
+          <circle cx="14.5" cy="14.5" r="5.5" fill="#bc9e88"/>
+          <!-- Sputnik Planitia (the famous heart) -->
+          <circle cx="17" cy="17.5" r="1.5" fill="#f0dcc4"/>
+          <circle cx="19.2" cy="17.5" r="1.5" fill="#f0dcc4"/>
+          <polygon points="15.5,18 20.7,18 18.1,21" fill="#f0dcc4"/>
+          <!-- dark "whale" feature -->
+          <ellipse cx="13" cy="14.5" rx="1.5" ry="1" fill="#5c4030"/>
+          <circle cx="14" cy="19" r="0.6" fill="#5c4030"/>
+        </g>
+      </svg>
+      <div class="label">PLUTO</div>
+    </div>
+
+    <!-- ─── ASTEROID ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <circle cx="16" cy="16" r="14" fill="#a89c8a" opacity="0.05"/>
+        <circle cx="16" cy="16" r="11" fill="#a89c8a" opacity="0.08"/>
+        <!-- lumpy asteroid body -->
+        <polygon points="10,11 14,8 18,9 22,11 24,14 23,18 22,22 18,24 14,23 11,21 8,17 9,13" fill="#6a5e4e"/>
+        <!-- highlight side -->
+        <polygon points="11,11 14,9 18,10 20,12 19,17 16,18 13,17 11,15" fill="#8a7e6e"/>
+        <!-- top highlight stripe -->
+        <polygon points="13,9 17,9 19,10 16,11 13,10" fill="#a89c8a"/>
+        <!-- craters -->
+        <circle cx="13" cy="14" r="1.4" fill="#3a2e22"/>
+        <circle cx="13" cy="14" r="0.7" fill="#5a4e42"/>
+        <circle cx="17" cy="13" r="0.8" fill="#3a2e22"/>
+        <circle cx="20" cy="17" r="1" fill="#3a2e22"/>
+        <circle cx="20" cy="17" r="0.5" fill="#5a4e42"/>
+        <circle cx="14" cy="20" r="0.7" fill="#3a2e22"/>
+        <circle cx="18" cy="21" r="0.5" fill="#3a2e22"/>
+      </svg>
+      <div class="label">ASTEROID</div>
+    </div>
+
+    <!-- ─── MILKY WAY ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <!-- outer halo -->
+        <circle cx="16" cy="16" r="15" fill="#9080c0" opacity="0.08"/>
+        <circle cx="16" cy="16" r="13" fill="#a090d0" opacity="0.10"/>
+        <!-- faint galactic disk -->
+        <ellipse cx="16" cy="16" rx="12" ry="10" fill="#6a5894" opacity="0.20"/>
+        <!-- main spiral arms (two big sweeps) -->
+        <path d="M 4,16 Q 6,9 13,9 Q 19,9 22,12" stroke="#c4b0e0" stroke-width="1.2" fill="none" opacity="0.75"/>
+        <path d="M 28,16 Q 26,23 19,23 Q 13,23 10,20" stroke="#c4b0e0" stroke-width="1.2" fill="none" opacity="0.75"/>
+        <!-- secondary inner arms -->
+        <path d="M 9,12 Q 13,9 17,11" stroke="#e0d0f0" stroke-width="0.7" fill="none" opacity="0.7"/>
+        <path d="M 23,20 Q 19,23 15,21" stroke="#e0d0f0" stroke-width="0.7" fill="none" opacity="0.7"/>
+        <!-- bright core bulge -->
+        <ellipse cx="16" cy="16" rx="4.5" ry="3" fill="#d8b878" opacity="0.55"/>
+        <ellipse cx="16" cy="16" rx="3" ry="2" fill="#f0d090"/>
+        <ellipse cx="16" cy="16" rx="1.8" ry="1.2" fill="#fff0c8"/>
+        <circle cx="16" cy="16" r="0.7" fill="#ffffff"/>
+        <!-- scattered stars -->
+        <circle cx="5" cy="6" r="0.4" fill="#fff"/>
+        <circle cx="27" cy="7" r="0.3" fill="#fff"/>
+        <circle cx="9" cy="27" r="0.3" fill="#fff"/>
+        <circle cx="25" cy="26" r="0.4" fill="#fff"/>
+        <circle cx="3" cy="20" r="0.3" fill="#fff"/>
+        <circle cx="29" cy="13" r="0.3" fill="#fff"/>
+        <circle cx="11" cy="4" r="0.3" fill="#fff"/>
+        <circle cx="21" cy="29" r="0.3" fill="#fff"/>
+      </svg>
+      <div class="label">MILKY WAY</div>
+    </div>
+
+    <div class="row-label">~ ORIGINAL FOR COMPARISON ~</div>
+
+    <!-- ─── ORIGINAL MOON ─────────────────────────────────── -->
+    <div class="cell">
+      <svg class="body" viewBox="0 0 32 32" shape-rendering="crispEdges">
+        <circle cx="16" cy="16" r="15" fill="#fff8e0" opacity="0.07"/>
+        <circle cx="16" cy="16" r="12" fill="#fff8e0" opacity="0.12"/>
+        <circle cx="16" cy="16" r="9" fill="#fff5d8"/>
+        <circle cx="14" cy="14" r="7" fill="#fffaea"/>
+        <circle cx="13" cy="13" r="1" fill="#e8e0c0"/>
+        <circle cx="19" cy="18" r="1.2" fill="#e8e0c0"/>
+        <circle cx="17" cy="14" r="0.8" fill="#e8e0c0"/>
+        <circle cx="15" cy="19" r="0.6" fill="#e8e0c0"/>
+      </svg>
+      <div class="label">MOON</div>
+    </div>
+
+  </div>
+
+  <script>
+    // Sprinkle some background stars
+    for (let i = 0; i < 40; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      s.style.left = Math.random() * 100 + 'vw';
+      s.style.top = Math.random() * 100 + 'vh';
+      s.style.opacity = 0.3 + Math.random() * 0.6;
+      document.body.appendChild(s);
+    }
+  </script>
+</body>
+</html>
