@@ -554,7 +554,7 @@
          blocks bops. */
   .brand {
     position: absolute;
-    top: 92px;                                   /* aligns with counter top */
+    top: clamp(8px, 1.8vw, 18px);                /* equidistant from top & left edges */
     left: clamp(8px, 1.8vw, 18px);               /* proportional corner inset */
     width: min(clamp(48px, 11.5vmin, 99px),
                max(34px, calc(50vw - 121px)));   /* never reaches the counter */
@@ -859,8 +859,6 @@
     /* Lower penguin and shrink sprite to fit the shorter landscape. */
     .penguin-wrap { bottom: 3%; }
     .penguin-sprite { height: clamp(140px, 65vh, 240px); }
-    /* Counter rises to top:54px here, so keep the brand aligned with it. */
-    .brand { top: 54px; }
   }
 
   /* ── NARROW VIEWPORTS (e.g., portrait phones) ──
