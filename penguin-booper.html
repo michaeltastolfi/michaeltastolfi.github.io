@@ -489,8 +489,14 @@
     font-family: 'Press Start 2P', monospace;
     font-size: 9px;
     letter-spacing: 0.18em;
-    text-shadow: 2px 2px 0 var(--ink);
-    opacity: 0.85;
+    color: var(--amber);
+    opacity: 1;
+    text-shadow:
+      1px 0 0 var(--ink),  -1px 0 0 var(--ink),
+      0 1px 0 var(--ink),  0 -1px 0 var(--ink),
+      1px 1px 0 var(--ink), -1px 1px 0 var(--ink),
+      1px -1px 0 var(--ink), -1px -1px 0 var(--ink),
+      0 2px 3px rgba(0,0,0,0.35);
   }
   footer .arrow {
     display: inline-block;
@@ -671,9 +677,16 @@
     position: absolute;
     bottom: 90px;
     right: 24px;
-    display: flex;
+    display: none;
     gap: 4px;
     z-index: 20;
+  }
+  .debug-set.revealed {
+    display: flex;
+  }
+  #booper-word {
+    cursor: pointer;
+    pointer-events: auto;
   }
   .debug-set input {
     width: 70px;
@@ -1143,7 +1156,7 @@
   </div>
 
   <header>
-    <h1>PENGUIN<span class="dot">·</span>BOOPER</h1>
+    <h1>PENGUIN<span class="dot">·</span><span id="booper-word">BOOPER</span></h1>
     <div class="tagline">~ an exercise in joyful boops ~</div>
   </header>
 
@@ -1487,7 +1500,12 @@
     syncAchievementsSilently();
     updateProgressBar();
   }
-  function saveTotal() {
+  // Persisting the count is debounced so rapid tapping never blocks on
+  // synchronous localStorage writes (a source of jank on mobile Chrome). The
+  // in-memory count is always current; we just flush it to storage on a short
+  // timer, plus immediately when the page is hidden/unloaded so nothing is lost.
+  let saveTimer = null;
+  function writeTotalNow() {
     try {
       localStorage.setItem(STORAGE_KEY, String(totalCount));
     } catch (e) {
@@ -1497,6 +1515,22 @@
       }
     }
   }
+  function saveTotal() {
+    if (saveTimer !== null) return;       // a flush is already scheduled
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      writeTotalNow();
+    }, 400);
+  }
+  function flushTotal() {
+    if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null; }
+    writeTotalNow();
+  }
+  // Make sure the latest count is persisted before the page goes away.
+  window.addEventListener('pagehide', flushTotal);
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushTotal();
+  });
 
   // ─── AUDIO ─────────────────────────────────────────────────
   // Web Audio routes to whatever audio output the OS has selected (including
@@ -2273,23 +2307,39 @@
   // input devices that may only emit click events, like some assistive tech
   // or wearable display browsers). When both fire for the same interaction,
   // the click is suppressed.
-  let lastEventTime = 0;
-  let lastEventWasPointer = false;
+  // Each real tap fires pointerdown then a paired click. We want to count the
+  // tap once. Rather than ignore every click for a fixed window (which drops
+  // legitimate clicks from *separate* fast taps), we suppress only the single
+  // click that pairs with the most recent pointerdown.
+  let pendingClickSuppress = false;
+  let suppressTimer = null;
 
   function handleBop(event) {
     if (event.target.closest('.reset-btn')) return;
     if (event.target.closest('.audio-btns')) return;
     if (event.target.closest('.brand-link')) return;
     if (event.target.closest('.debug-set')) return;  // DEBUG: remove later
+    if (event.target.closest('#booper-word')) return; // secret toggle for debug box
 
-    // Dedupe: if a pointerdown just fired, ignore the synthetic click that follows.
     const now = Date.now();
-    if (event.type === 'click' && lastEventWasPointer && now - lastEventTime < 600) {
-      lastEventWasPointer = false;
-      return;
+
+    if (event.type === 'pointerdown') {
+      // Arm suppression of the one click that will follow this pointerdown.
+      pendingClickSuppress = true;
+      if (suppressTimer !== null) clearTimeout(suppressTimer);
+      // Safety: if no paired click arrives (e.g. canceled), disarm so a later
+      // real click isn't wrongly dropped.
+      suppressTimer = setTimeout(() => { pendingClickSuppress = false; }, 700);
+    } else if (event.type === 'click') {
+      if (pendingClickSuppress) {
+        // This click is the partner of the pointerdown we just counted.
+        pendingClickSuppress = false;
+        if (suppressTimer !== null) { clearTimeout(suppressTimer); suppressTimer = null; }
+        return;
+      }
+      // A click with no preceding pointerdown is a real tap on its own
+      // (unusual input devices) — let it through.
     }
-    lastEventTime = now;
-    lastEventWasPointer = (event.type === 'pointerdown');
 
     if (isFallen) { recoverEarly(); return; }
 
@@ -2438,6 +2488,22 @@
     setCountInput.addEventListener(evt, (e) => e.stopPropagation());
     setCountBtn.addEventListener(evt, (e) => e.stopPropagation());
   });
+
+  // Secret reveal: clicking "BOOPER" in the title 20 times shows the debug box;
+  // another 20 hides it again. Not persisted, so the box is always hidden on load.
+  const debugSet = document.querySelector('.debug-set');
+  const booperWord = $('booper-word');
+  let booperClicks = 0;
+  if (booperWord && debugSet) {
+    booperWord.addEventListener('click', (e) => {
+      e.stopPropagation();
+      booperClicks++;
+      if (booperClicks >= 20) {
+        booperClicks = 0;
+        debugSet.classList.toggle('revealed');
+      }
+    });
+  }
   // ─── END DEBUG ──────
 
   // Keyboard fallback: some unusual browsers (assistive tech, wearable display
