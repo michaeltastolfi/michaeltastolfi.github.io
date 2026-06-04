@@ -509,35 +509,78 @@
     50%, 100% { opacity: 0.2; }
   }
 
-  /* ── RESET BUTTON ── */
-  .reset-btn {
+  /* ── RESET CONTROL: slide to arm, then tap to confirm ── */
+  .reset-slider {
     position: absolute;
     bottom: 50px; right: 24px;
+    width: 150px;
+    height: 30px;
     background: #2a2554;
+    z-index: 20;
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    box-shadow:
+      0 0 0 3px var(--ink),
+      3px 3px 0 3px rgba(0,0,0,0.45);
+  }
+  .reset-slider-label {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    left: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    letter-spacing: 0.08em;
     color: var(--paper);
+    text-shadow: 1px 1px 0 var(--ink);
+    pointer-events: none;
+    transition: opacity 0.1s linear;
+  }
+  .reset-slider-handle {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--amber);
+    color: var(--ink);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    box-shadow: 2px 0 0 0 var(--ink);
+    will-change: left;
+  }
+  .reset-confirm {
+    position: absolute;
+    bottom: 50px; right: 24px;
+    width: 150px;
+    height: 30px;
+    display: none;
+    background: var(--amber);
+    color: var(--ink);
     font-family: 'Press Start 2P', monospace;
     font-size: 8px;
     letter-spacing: 0.1em;
-    padding: 8px 12px;
     border: none;
     cursor: pointer;
     z-index: 20;
-    text-shadow: 1px 1px 0 var(--ink);
+    text-shadow: 1px 1px 0 rgba(255,255,255,0.4);
     box-shadow:
       0 0 0 3px var(--ink),
       3px 3px 0 3px rgba(0,0,0,0.45);
     transition: transform 0.05s steps(2);
   }
-  .reset-btn:active {
+  .reset-confirm.show { display: block; }
+  .reset-confirm:active {
     transform: translate(2px, 2px);
     box-shadow:
       0 0 0 3px var(--ink),
       1px 1px 0 3px rgba(0,0,0,0.45);
-  }
-  .reset-btn.armed {
-    background: var(--amber);
-    color: var(--ink);
-    text-shadow: 1px 1px 0 rgba(255,255,255,0.4);
   }
   .copyright {
     position: absolute;
@@ -1268,7 +1311,11 @@
     </button>
   </div>
 
-  <button class="reset-btn" id="reset-btn">RESET</button>
+  <div class="reset-slider" id="reset-slider" role="button" aria-label="Slide to reset">
+    <span class="reset-slider-label" id="reset-slider-label">SLIDE TO RESET</span>
+    <div class="reset-slider-handle" id="reset-slider-handle">&raquo;</div>
+  </div>
+  <button class="reset-confirm" id="reset-confirm">TAP TO CONFIRM</button>
   <div class="copyright">© 2026 Michael T. Astolfi</div>
 
 <script>
@@ -2307,15 +2354,16 @@
   // input devices that may only emit click events, like some assistive tech
   // or wearable display browsers). When both fire for the same interaction,
   // the click is suppressed.
-  // Each real tap fires pointerdown then a paired click. We want to count the
-  // tap once. Rather than ignore every click for a fixed window (which drops
-  // legitimate clicks from *separate* fast taps), we suppress only the single
-  // click that pairs with the most recent pointerdown.
+  // Each real interaction fires pointerdown then a paired click (the click
+  // fires on *release*, however long the button is held). We count it once on
+  // pointerdown and suppress the partner click. The suppression flag is armed on
+  // pointerdown and only cleared by the matching click (or a new pointerdown),
+  // so holding the button for any length of time still counts as a single bop.
   let pendingClickSuppress = false;
-  let suppressTimer = null;
 
   function handleBop(event) {
-    if (event.target.closest('.reset-btn')) return;
+    if (event.target.closest('.reset-slider')) return;
+    if (event.target.closest('.reset-confirm')) return;
     if (event.target.closest('.audio-btns')) return;
     if (event.target.closest('.brand-link')) return;
     if (event.target.closest('.debug-set')) return;  // DEBUG: remove later
@@ -2324,17 +2372,13 @@
     const now = Date.now();
 
     if (event.type === 'pointerdown') {
-      // Arm suppression of the one click that will follow this pointerdown.
+      // Arm suppression of the one click that will follow this pointerdown
+      // (no matter how long the button is held before release).
       pendingClickSuppress = true;
-      if (suppressTimer !== null) clearTimeout(suppressTimer);
-      // Safety: if no paired click arrives (e.g. canceled), disarm so a later
-      // real click isn't wrongly dropped.
-      suppressTimer = setTimeout(() => { pendingClickSuppress = false; }, 700);
     } else if (event.type === 'click') {
       if (pendingClickSuppress) {
         // This click is the partner of the pointerdown we just counted.
         pendingClickSuppress = false;
-        if (suppressTimer !== null) { clearTimeout(suppressTimer); suppressTimer = null; }
         return;
       }
       // A click with no preceding pointerdown is a real tap on its own
@@ -2413,26 +2457,13 @@
     }
   }
 
-  const resetBtn = $('reset-btn');
-  let resetArmed = false;
-  resetBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (!resetArmed) {
-      resetArmed = true;
-      resetBtn.textContent = 'CONFIRM?';
-      resetBtn.classList.add('armed');
-      clearTimeout(resetTimer);
-      resetTimer = setTimeout(() => {
-        resetArmed = false;
-        resetBtn.textContent = 'RESET';
-        resetBtn.classList.remove('armed');
-      }, 2500);
-      return;
-    }
-    resetArmed = false;
-    clearTimeout(resetTimer);
-    resetBtn.textContent = 'RESET';
-    resetBtn.classList.remove('armed');
+  // ── Reset control: slide the handle fully right to arm, then tap CONFIRM ──
+  const resetSlider = $('reset-slider');
+  const resetHandle = $('reset-slider-handle');
+  const resetLabel = $('reset-slider-label');
+  const resetConfirm = $('reset-confirm');
+
+  function performReset() {
     const prevTotalForReset = totalCount;
     totalCount = 0;
     sessionCount = 0;
@@ -2445,6 +2476,88 @@
       setFrame('HAPPY');
       setTimeout(returnToIdle, 900);
     }
+  }
+
+  // Geometry: the handle travels from x=0 to (track width - handle width).
+  const HANDLE_W = 30;
+  function maxTravel() { return resetSlider.clientWidth - HANDLE_W; }
+
+  let dragging = false;
+  let dragStartX = 0;       // pointer x where the drag began
+  let handleX = 0;          // current handle offset in px
+  let pointerId = null;
+
+  function setHandleX(px) {
+    const max = maxTravel();
+    handleX = Math.max(0, Math.min(max, px));
+    resetHandle.style.left = handleX + 'px';
+    // Fade the label out as the handle covers it.
+    resetLabel.style.opacity = String(1 - Math.min(1, handleX / max));
+  }
+
+  function snapBack() {
+    resetHandle.style.transition = 'left 0.15s steps(3)';
+    setHandleX(0);
+    resetLabel.style.opacity = '1';
+    setTimeout(() => { resetHandle.style.transition = ''; }, 160);
+  }
+
+  function arm() {
+    // Hide slider, show the confirm button. Auto-disarm after a few seconds.
+    resetSlider.style.display = 'none';
+    resetConfirm.classList.add('show');
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(disarm, 3000);
+  }
+
+  function disarm() {
+    clearTimeout(resetTimer);
+    resetConfirm.classList.remove('show');
+    resetSlider.style.display = '';
+    setHandleX(0);
+    resetLabel.style.opacity = '1';
+  }
+
+  resetSlider.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    dragging = true;
+    pointerId = e.pointerId;
+    dragStartX = e.clientX - handleX;
+    resetHandle.style.transition = '';
+    try { resetSlider.setPointerCapture(pointerId); } catch (_) {}
+  });
+
+  resetSlider.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    e.stopPropagation();
+    setHandleX(e.clientX - dragStartX);
+  });
+
+  function endDrag(e) {
+    if (!dragging) return;
+    if (e) e.stopPropagation();
+    dragging = false;
+    try { resetSlider.releasePointerCapture(pointerId); } catch (_) {}
+    pointerId = null;
+    // Armed only if dragged (almost) the whole way.
+    if (handleX >= maxTravel() - 2) {
+      arm();
+    } else {
+      snapBack();
+    }
+  }
+  resetSlider.addEventListener('pointerup', endDrag);
+  resetSlider.addEventListener('pointercancel', endDrag);
+
+  resetConfirm.addEventListener('click', (e) => {
+    e.stopPropagation();
+    disarm();
+    performReset();
+  });
+  // Don't let a press on the confirm button bubble up as a bop.
+  ['pointerdown', 'mousedown', 'touchstart'].forEach(evt => {
+    resetConfirm.addEventListener(evt, (e) => e.stopPropagation());
   });
 
   // Listen to both pointerdown and click. pointerdown handles modern devices
@@ -2453,6 +2566,9 @@
   // in handleBop prevents double-firing.
   document.addEventListener('pointerdown', handleBop);
   document.addEventListener('click', handleBop);
+  // If a pointer interaction is cancelled, no paired click will arrive, so
+  // disarm the suppression flag to avoid wrongly dropping a later lone click.
+  document.addEventListener('pointercancel', () => { pendingClickSuppress = false; });
 
   // ─── DEBUG: manual lifetime-count setter (remove later) ──────
   const setCountInput = $('set-count-input');
@@ -2508,7 +2624,10 @@
 
   // Keyboard fallback: some unusual browsers (assistive tech, wearable display
   // devices) may primarily emit keyboard events. Space and Enter trigger a bop.
+  // Holding a key down triggers OS key-repeat (a stream of keydown events with
+  // .repeat === true); we ignore those so a held key is just a single boop.
   document.addEventListener('keydown', (e) => {
+    if (e.repeat) return;                    // ignore auto-repeat from a held key
     if (e.target === setCountInput) return;  // don't intercept while typing in debug box
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
