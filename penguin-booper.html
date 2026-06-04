@@ -953,6 +953,9 @@
      widths so the text never grows wider than the (now smaller) logo. */
   @media (max-width: 600px) {
     .brand-text { font-size: clamp(8px, 2.6vw, 12px); }
+    /* Lift the tap hint so it clears the bottom-right copyright line on
+       narrow screens, but keep it below the reset slider / audio buttons. */
+    footer { bottom: 28px; }
   }
 </style>
 </head>
