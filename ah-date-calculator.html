@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Star Penguin AH Date Calculator</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #0b1724;
+      color: #eef7ff;
+    }
+
+    .calculator {
+      max-width: 760px;
+      margin: 0 auto;
+      background: #13283b;
+      border: 1px solid #31516b;
+      border-radius: 18px;
+      padding: 30px;
+    }
+
+    h1 {
+      margin-top: 0;
+      text-align: center;
+      font-size: 2rem;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #b8cddd;
+      margin-bottom: 30px;
+    }
+
+    .inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.9rem;
+      color: #b8cddd;
+    }
+
+    select,
+    input {
+      width: 100%;
+      padding: 12px;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: 1px solid #52738d;
+      background: #09131d;
+      color: white;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.05rem;
+      font-weight: bold;
+      cursor: pointer;
+      background: #f2b84b;
+      color: #16202a;
+      margin-bottom: 25px;
+    }
+
+    button:hover {
+      background: #ffd06f;
+    }
+
+    .result {
+      text-align: center;
+      background: #09131d;
+      border-radius: 14px;
+      padding: 25px;
+      margin-bottom: 30px;
+    }
+
+    .human-date {
+      color: #9db6ca;
+      font-size: 1rem;
+    }
+
+    .arrow {
+      font-size: 2rem;
+      margin: 8px 0;
+      color: #f2b84b;
+    }
+
+    .ah-date {
+      font-size: 2.4rem;
+      font-weight: bold;
+      color: #ffffff;
+    }
+
+    .explanation {
+      color: #b8cddd;
+      margin-top: 10px;
+      font-size: 0.95rem;
+    }
+
+    .timeline-title {
+      font-weight: bold;
+      margin-bottom: 12px;
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 4px;
+    }
+
+    .month {
+      background: #20394e;
+      min-height: 72px;
+      border-radius: 7px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+      padding: 5px;
+      font-size: 0.75rem;
+    }
+
+    .month strong {
+      font-size: 0.8rem;
+      margin-bottom: 5px;
+    }
+
+    .month.selected {
+      outline: 3px solid #f2b84b;
+      background: #36546c;
+    }
+
+    .month.new-year {
+      border-left: 4px solid #f2b84b;
+    }
+
+    .legend {
+      margin-top: 15px;
+      color: #9db6ca;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .egg-note {
+      margin-top: 30px;
+      padding: 18px;
+      border-left: 4px solid #f2b84b;
+      background: #0d1d2b;
+      border-radius: 6px;
+    }
+
+    .egg-note strong {
+      color: #f2b84b;
+    }
+
+    @media (max-width: 600px) {
+      .inputs {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="calculator">
+
+    <h1>🥚 After Hatching Date Calculator</h1>
+
+    <div class="subtitle">
+      Convert a human calendar date into the Star Penguins' AH calendar.
+    </div>
+
+    <div class="inputs">
+
+      <div>
+        <label for="month">Human Month</label>
+        <select id="month">
+          <option value="1">January</option>
+          <option value="2" selected>February</option>
+          <option value="3">March</option>
+          <option value="4">April</option>
+          <option value="5">May</option>
+          <option value="6">June</option>
+          <option value="7">July</option>
+          <option value="8">August</option>
+          <option value="9">September</option>
+          <option value="10">October</option>
+          <option value="11">November</option>
+          <option value="12">December</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="year">Human Year</label>
+        <input id="year" type="number" value="2027">
+      </div>
+
+    </div>
+
+    <button id="calculate">Convert to AH Date</button>
+
+    <div class="result">
+
+      <div class="human-date" id="humanDate">
+        February 2027
+      </div>
+
+      <div class="arrow">↓</div>
+
+      <div class="ah-date" id="ahDate">
+        February 167 AH
+      </div>
+
+      <div class="explanation" id="explanation">
+        The 167th AH year began in November 2026.
+      </div>
+
+    </div>
+
+    <div class="timeline-title">
+      How the AH year overlaps the human calendar
+    </div>
+
+    <div class="timeline" id="timeline"></div>
+
+    <div class="legend">
+      The AH calendar year changes in <strong>November</strong>, not January.
+      November and December belong to the newly started AH year. January
+      through October remain in that same AH year even though the human year
+      number has increased.
+    </div>
+
+    <div class="egg-note">
+      <strong>The Hatching:</strong> November 1859 marks the beginning of
+      <strong>0 AH</strong>. December 1859 is therefore December 0 AH.
+      November 1860 begins 1 AH.
+    </div>
+
+  </div>
+
+
+<script>
+
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+  ];
+
+  const monthSelect = document.getElementById("month");
+  const yearInput = document.getElementById("year");
+  const calculateButton = document.getElementById("calculate");
+
+  const humanDate = document.getElementById("humanDate");
+  const ahDate = document.getElementById("ahDate");
+  const explanation = document.getElementById("explanation");
+  const timeline = document.getElementById("timeline");
+
+
+  /*
+     AH CALENDAR RULE
+
+     The Egg lands in November 1859.
+
+     November 1859 = November 0 AH
+     December 1859 = December 0 AH
+
+     January through October 1860 are still 0 AH.
+
+     November 1860 begins 1 AH.
+
+     Therefore:
+
+     November–December:
+       AH = Human Year - 1859
+
+     January–October:
+       AH = Human Year - 1860
+  */
+
+  function calculateAH(month, humanYear) {
+
+    if (month >= 11) {
+      return humanYear - 1859;
+    }
+
+    return humanYear - 1860;
+  }
+
+
+  function updateCalculator() {
+
+    const month = parseInt(monthSelect.value);
+    const humanYear = parseInt(yearInput.value);
+
+    if (!Number.isFinite(humanYear)) {
+      ahDate.textContent = "Enter a valid year";
+      return;
+    }
+
+    const ahYear = calculateAH(month, humanYear);
+    const monthName = monthNames[month - 1];
+
+    humanDate.textContent =
+      `${monthName} ${humanYear}`;
+
+    ahDate.textContent =
+      `${monthName} ${ahYear} AH`;
+
+
+    /*
+       Determine when the current AH year began.
+    */
+
+    let ahStartHumanYear;
+
+    if (month >= 11) {
+      ahStartHumanYear = humanYear;
+    } else {
+      ahStartHumanYear = humanYear - 1;
+    }
+
+    explanation.textContent =
+      `${ahYear} AH began in November ${ahStartHumanYear}.`;
+
+    drawTimeline(month, humanYear, ahYear);
+  }
+
+
+  function drawTimeline(selectedMonth, humanYear, ahYear) {
+
+    timeline.innerHTML = "";
+
+    for (let month = 1; month <= 12; month++) {
+
+      const box = document.createElement("div");
+      box.classList.add("month");
+
+      if (month === selectedMonth) {
+        box.classList.add("selected");
+      }
+
+      if (month === 11) {
+        box.classList.add("new-year");
+      }
+
+      const thisAHYear =
+        calculateAH(month, humanYear);
+
+      box.innerHTML = `
+        <strong>${monthNames[month - 1].substring(0,3)}</strong>
+        ${thisAHYear} AH
+      `;
+
+      timeline.appendChild(box);
+    }
+  }
+
+
+  calculateButton.addEventListener(
+    "click",
+    updateCalculator
+  );
+
+  monthSelect.addEventListener(
+    "change",
+    updateCalculator
+  );
+
+  yearInput.addEventListener(
+    "input",
+    updateCalculator
+  );
+
+
+  // Initialize with February 2027.
+  updateCalculator();
+
+</script>
+
+</body>
+</html>
